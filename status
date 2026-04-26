@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""System status display for Termux"""
+
+import json
+import os
+import subprocess
+import sys
+
+TERMUX_API = os.environ.get("PREFIX", "/data/data/com.termux/files/usr") + "/libexec/termux-api"
+
+
+def run_termux_api(method: str) -> dict:
+    try:
+        result = subprocess.run([TERMUX_API, method], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            return json.loads(result.stdout)
+    except:
+        pass
+    return {}
+
+
+def run_cmd(cmd: list) -> str:
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.stdout.strip()
+    except:
+        return ""
+
+
+def get_battery():
+    data = run_termux_api("BatteryStatus")
+    if not data:
+        return None
+    pct = data.get("percentage", data.get("level", "?"))
+    status = data.get("status", "?").lower()
+    temp = data.get("temperature", "?")
+    plugged = data.get("plugged", "UNPLUGGED") != "UNPLUGGED"
+    return {"pct": pct, "status": status, "temp": temp, "plugged": plugged}
+
+
+def get_wifi():
+    data = run_termux_api("WifiConnectionInfo")
+    if not data:
+        return None
+    ip = data.get("ip", "?")
+    ssid = data.get("ssid", "?")
+    if ssid and ssid.startswith('"') and ssid.endswith('"'):
+        ssid = ssid[1:-1]
+    rssi = data.get("rssi", "?")
+    speed = data.get("link_speed_mbps", "?")
+    return {"ip": ip, "ssid": ssid, "rssi": rssi, "speed": speed}
+
+
+def get_storage():
+    output = run_cmd(["df", "-h", "/storage/emulated/0"])
+    lines = output.split("\n")
+    if len(lines) >= 2:
+        parts = lines[1].split()
+        if len(parts) >= 5:
+            return {"total": parts[1], "used": parts[2], "avail": parts[3], "pct": parts[4]}
+    return None
+
+
+def get_memory():
+    output = run_cmd(["free", "-h"])
+    lines = output.split("\n")
+    if len(lines) >= 2:
+        parts = lines[1].split()
+        if len(parts) >= 4:
+            return {"total": parts[1], "used": parts[2], "free": parts[3]}
+    return None
+
+
+def get_uptime():
+    output = run_cmd(["uptime"])
+    if "up" in output:
+        try:
+            up_part = output.split("up")[1].split(",")[0].strip()
+            load_part = output.split("load average:")[1].strip() if "load average:" in output else "?"
+            return {"uptime": up_part, "load": load_part}
+        except:
+            pass
+    return None
+
+
+def main():
+    print()
+    
+    battery = get_battery()
+    if battery:
+        plug = "+" if battery["plugged"] else ""
+        print(f"Battery: {battery['pct']}% {plug}{battery['status']} ({battery['temp']}C)")
+    
+    wifi = get_wifi()
+    if wifi:
+        ssid = wifi["ssid"] if wifi["ssid"] and wifi["ssid"] != "<unknown ssid>" else "WiFi"
+        print(f"Network: {ssid} @ {wifi['ip']} ({wifi['speed']}Mbps)")
+    
+    storage = get_storage()
+    if storage:
+        print(f"Storage: {storage['used']}/{storage['total']} ({storage['pct']} used)")
+    
+    memory = get_memory()
+    if memory:
+        print(f"Memory:  {memory['used']}/{memory['total']} used")
+    
+    uptime = get_uptime()
+    if uptime:
+        print(f"Uptime:  {uptime['uptime']} (load: {uptime['load']})")
+    
+    print()
+
+
+if __name__ == "__main__":
+    main()
