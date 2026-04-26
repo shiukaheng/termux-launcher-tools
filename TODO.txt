@@ -1,38 +1,43 @@
 # Termux Launcher Tools - Implementation Spec
 
+## Status
+- [x] `music` - Implemented
+- [x] `launch` - Implemented
+- [ ] `notifications` - Pending (requires termux-api modification)
+
+---
+
 ## Tech Stack
 - Pure Python 3 (no external packages)
 - JSON for data storage (no sqlite - simpler, no dependencies)
 - termux-api for Android integration
 
-## Tool 1: `launch` - Fuzzy App Launcher
+## Tool 1: `launch` - Fuzzy App Launcher ✅ IMPLEMENTED
 
 ### Usage
 ```
 launch <app name with spaces>
 launch --reindex
-launch --list
+launch --list [filter]
 ```
 
 ### Implementation Details
 
 **App Indexing:**
-- Lazy indexing on first run, cached to `~/.termux-launcher/apps.json`
-- `--reindex` flag to force refresh
-- Use `pm list packages -3` for user apps, `-3 -d` for disabled
-- Get app labels via `dumpsys package <pkg>` or `cmd package list packages -f --show-versioncode`
-- Alternatively: `pm list packages -f` gives apk paths, then parse with `aapt dump badging <apk>` for label
-- Actually simpler: use `monkey -p <package> -c android.intent.category.LAUNCHER 1` only needs package name
-- For labels: `pm dump <package> | grep -A1 "Activity Resolver Table"` then parse launch intent
+- Manual indexing only via `--reindex` flag (no auto-reindex)
+- Indexes ALL apps (system + user) via `pm list packages --user 0`
+- Get app labels via `pm path <pkg>` + `aapt dump badging <apk>`
+- Cached to `~/.termux-launcher/apps.json`
+- Progress indicator during indexing
 
 **Data Structure (apps.json):**
 ```json
 {
   "version": 1,
-  "last_indexed": "2024-01-15T10:30:00",
+  "indexed_at": 1705912345,
   "apps": [
-    {"package": "com.whatsapp", "label": "WhatsApp"},
-    {"package": "com.instagram.android", "label": "Instagram"}
+    {"pkg": "com.whatsapp", "label": "WhatsApp"},
+    {"pkg": "com.instagram.android", "label": "Instagram"}
   ]
 }
 ```
@@ -49,7 +54,7 @@ launch --list
 
 ---
 
-## Tool 2: `music` - Media Control
+## Tool 2: `music` - Media Control ✅ IMPLEMENTED
 
 ### Usage
 ```

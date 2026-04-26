@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Fuzzy app launcher for Termux"""
+
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib.apps import (
+    load_index,
+    index_apps,
+    search_apps,
+    launch_app,
+    list_apps,
+    get_app_index_path
+)
+
+
+def main():
+    args = sys.argv[1:]
+    
+    if not args:
+        print("Usage: launch <app name>")
+        print("       launch --reindex")
+        print("       launch --list [filter]")
+        sys.exit(1)
+    
+    if args[0] == "--reindex":
+        print("Indexing apps...")
+        index = index_apps()
+        print(f"Indexed {len(index['apps'])} apps")
+        sys.exit(0)
+    
+    if args[0] == "--list":
+        index = load_index()
+        if not index:
+            print("No app index found. Run: launch --reindex", file=sys.stderr)
+            sys.exit(1)
+        
+        filter_str = args[1] if len(args) > 1 else None
+        apps = list_apps(index, filter_str)
+        
+        for app in apps:
+            print(f"{app['label']} ({app['pkg']})")
+        sys.exit(0)
+    
+    query = " ".join(args)
+    
+    index = load_index()
+    if not index:
+        print("No app index found. Run: launch --reindex", file=sys.stderr)
+        sys.exit(1)
+    
+    matches = search_apps(query, index)
+    
+    if not matches:
+        print(f"No apps found matching '{query}'", file=sys.stderr)
+        sys.exit(1)
+    
+    if len(matches) == 1 or matches[0]["ratio"] >= 0.8:
+        app = matches[0]
+        print(f"Launching: {app['label']}")
+        launch_app(app["pkg"])
+    else:
+        print(f"Multiple matches for '{query}':")
+        for i, app in enumerate(matches[:3]):
+            print(f"  [{i + 1}] {app['label']} ({app['pkg']}) - {app['ratio']:.0%} match")
+        
+        try:
+            choice = input("Select (1-3) or Enter to cancel: ").strip()
+            if choice in ("1", "2", "3"):
+                idx = int(choice) - 1
+                if idx < len(matches):
+                    app = matches[idx]
+                    print(f"Launching: {app['label']}")
+                    launch_app(app["pkg"])
+        except (EOFError, KeyboardInterrupt):
+            print("\nCancelled")
+
+
+if __name__ == "__main__":
+    main()
