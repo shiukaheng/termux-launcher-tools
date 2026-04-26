@@ -1,0 +1,162 @@
+# Termux Launcher Tools - Implementation Spec
+
+## Tech Stack
+- Pure Python 3 (no external packages)
+- JSON for data storage (no sqlite - simpler, no dependencies)
+- termux-api for Android integration
+
+## Tool 1: `launch` - Fuzzy App Launcher
+
+### Usage
+```
+launch <app name with spaces>
+launch --reindex
+launch --list
+```
+
+### Implementation Details
+
+**App Indexing:**
+- Lazy indexing on first run, cached to `~/.termux-launcher/apps.json`
+- `--reindex` flag to force refresh
+- Use `pm list packages -3` for user apps, `-3 -d` for disabled
+- Get app labels via `dumpsys package <pkg>` or `cmd package list packages -f --show-versioncode`
+- Alternatively: `pm list packages -f` gives apk paths, then parse with `aapt dump badging <apk>` for label
+- Actually simpler: use `monkey -p <package> -c android.intent.category.LAUNCHER 1` only needs package name
+- For labels: `pm dump <package> | grep -A1 "Activity Resolver Table"` then parse launch intent
+
+**Data Structure (apps.json):**
+```json
+{
+  "version": 1,
+  "last_indexed": "2024-01-15T10:30:00",
+  "apps": [
+    {"package": "com.whatsapp", "label": "WhatsApp"},
+    {"package": "com.instagram.android", "label": "Instagram"}
+  ]
+}
+```
+
+**Fuzzy Search:**
+- Levenshtein distance implementation (stdlib only)
+- Case-insensitive matching
+- Return top 3 matches if no exact match, prompt user to select
+- If only one close match (distance < 3), launch directly
+
+**Launch Mechanism:**
+- Primary: `monkey -p <package> -c android.intent.category.LAUNCHER 1`
+- Fallback: `am start -n <package>/<activity>` (requires knowing main activity)
+
+---
+
+## Tool 2: `music` - Media Control
+
+### Usage
+```
+music play
+music pause
+music next
+music prev
+music status
+```
+
+### Implementation Details
+- Simple wrapper around `termux-media-player`
+- No local state needed
+- Status returns current playing info from `termux-media-player info`
+
+---
+
+## Tool 3: `notifications` - Notification Manager
+
+### Usage
+```
+notifications list
+notifications pop <idx>
+notifications clear [<idx>]
+```
+
+### Implementation Details
+
+**Prerequisites:**
+- Requires `pkg install termux-api`
+- User must grant notification access to Termux:API app in Android settings
+
+**`list` Command:**
+- Call `termux-notification-list`
+- Parse JSON output
+- Display with index numbers for user reference
+- Show: idx, app name, title, content preview (truncated)
+
+**`pop <idx>` Command:**
+- Triggers notification's tap action (as if user clicked it)
+- **REQUIRES MODIFICATION TO termux-api**:
+  - Add `NotificationPopAPI.java` using `NotificationListenerService`
+  - Get `StatusBarNotification` by key
+  - Call `notification.contentIntent.send()` to trigger tap action
+- Fallback: If no contentIntent, just launch the source app
+
+**`clear [<idx>]` Command:**
+- `clear` with no args: clear all notifications
+- `clear <idx>`: clear specific notification
+- Uses `termux-notification-remove` with notification id/key
+
+---
+
+## File Structure
+```
+termux-launcher-tools/
+├── launch.py           # Executable script
+├── music.py            # Executable script  
+├── notifications.py    # Executable script
+├── lib/
+│   ├── __init__.py
+│   ├── fuzzy.py        # Levenshtein distance
+│   └── apps.py         # App indexing & search
+└── data/               # Created at runtime in ~/.termux-launcher/
+    └── apps.json
+```
+
+---
+
+## termux-api Modifications Required
+
+### New File: `app/src/main/java/com/termux/api/apis/NotificationPopAPI.java`
+
+```java
+// Pseudocode:
+public class NotificationPopAPI {
+    public static void onReceive(...) {
+        String key = intent.getStringExtra("key");
+        StatusBarNotification sbn = findByKey(key);
+        PendingIntent contentIntent = sbn.getNotification().contentIntent;
+        if (contentIntent != null) {
+            contentIntent.send();
+        }
+        // Also cancel the notification after "tap"
+        NotificationService.get().cancelNotification(key);
+    }
+}
+```
+
+### New Script: `termux-notification-pop.in`
+```sh
+@TERMUX_PREFIX@/libexec/termux-api NotificationPop --es key "$1"
+```
+
+---
+
+## Error Handling
+
+- All tools should handle missing termux-api gracefully
+- Check if termux-api package installed: `command -v termux-api`
+- Check if Termux:API app has required permissions
+- App index: handle corrupted JSON by reindexing
+
+---
+
+## Future Considerations
+
+- `launch` could support aliases (e.g., `launch wa` -> WhatsApp)
+- `music` could integrate with specific players (Spotify, YouTube Music)
+- `notifications` could filter by app, show only certain types
