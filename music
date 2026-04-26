@@ -1,40 +1,60 @@
 #!/usr/bin/env python3
-"""Music control via termux-media-player"""
+"""Music control via Android media_session"""
 
 import subprocess
 import sys
 
 
-def run_termux_media_player(args):
+def dispatch_media_key(key: str) -> bool:
     try:
         result = subprocess.run(
-            ["termux-media-player"] + args,
+            ["cmd", "media_session", "dispatch", key],
             capture_output=True,
             text=True
         )
-        if result.returncode != 0:
-            print(f"Error: {result.stderr.strip()}", file=sys.stderr)
-            sys.exit(1)
-        print(result.stdout.strip())
-    except FileNotFoundError:
-        print("Error: termux-media-player not found. Install with: pkg install termux-api", file=sys.stderr)
-        sys.exit(1)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def get_volume() -> str:
+    try:
+        result = subprocess.run(
+            ["cmd", "media_session", "volume", "--get"],
+            capture_output=True,
+            text=True
+        )
+        return result.stdout.strip()
+    except Exception:
+        return "Unable to get volume"
 
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: music <play|pause|next|prev|status>")
+        print("Usage: music <play|pause|toggle|next|prev|volume>")
         sys.exit(1)
     
     cmd = sys.argv[1].lower()
     
-    if cmd == "status":
-        run_termux_media_player(["info"])
-    elif cmd in ("play", "pause", "next", "prev"):
-        run_termux_media_player([cmd])
+    key_map = {
+        "play": "play",
+        "pause": "pause",
+        "toggle": "play-pause",
+        "next": "next",
+        "prev": "previous",
+    }
+    
+    if cmd in key_map:
+        if dispatch_media_key(key_map[cmd]):
+            print(f"Sent: {cmd}")
+        else:
+            print(f"Error sending {cmd}", file=sys.stderr)
+            sys.exit(1)
+    elif cmd == "volume":
+        print(get_volume())
     else:
         print(f"Unknown command: {cmd}", file=sys.stderr)
-        print("Usage: music <play|pause|next|prev|status>")
+        print("Usage: music <play|pause|toggle|next|prev|volume>")
         sys.exit(1)
 
 
