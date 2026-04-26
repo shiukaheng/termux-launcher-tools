@@ -120,7 +120,8 @@ def search_apps(query: str, index: dict) -> list:
 def launch_app(pkg: str) -> bool:
     try:
         subprocess.run(
-            ["monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"],
+            ["am", "start", "-a", "android.intent.action.MAIN",
+             "-c", "android.intent.category.LAUNCHER", pkg],
             capture_output=True,
             text=True
         )
