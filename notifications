@@ -2,12 +2,16 @@
 """Notification manager for Termux - exposes Android NotificationListenerService API"""
 
 import json
+import os
 import subprocess
 import sys
 
 
+TERMUX_API = os.environ.get("PREFIX", "/data/data/com.termux/files/usr") + "/libexec/termux-api"
+
+
 def run_termux_api(method: str, args: list = None) -> tuple:
-    cmd = ["termux-api", method]
+    cmd = [TERMUX_API, method]
     if args:
         cmd.extend(args)
     try:
