@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
-"""Notification manager for Termux"""
+"""Notification manager for Termux - exposes Android NotificationListenerService API"""
 
 import json
 import subprocess
 import sys
 
 
-def get_notifications() -> list:
+def run_termux_api(method: str, args: list = None) -> tuple:
+    cmd = ["termux-api", method]
+    if args:
+        cmd.extend(args)
     try:
-        result = subprocess.run(
-            ["termux-notification-list"],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode != 0:
-            return []
-        return json.loads(result.stdout)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.returncode, result.stdout.strip(), result.stderr.strip()
     except FileNotFoundError:
-        print("Error: termux-notification-list not found. Install with: pkg install termux-api", file=sys.stderr)
+        print("Error: termux-api not found. Install with: pkg install termux-api", file=sys.stderr)
         sys.exit(1)
+
+
+def get_notifications() -> list:
+    returncode, stdout, stderr = run_termux_api("NotificationList")
+    if returncode != 0 or not stdout:
+        return []
+    try:
+        return json.loads(stdout)
     except json.JSONDecodeError:
         return []
 
@@ -33,81 +38,132 @@ def list_notifications():
         title = n.get("title", "")
         content = n.get("content", "")
         pkg = n.get("packageName", "")
-        when = n.get("when", "")
+        has_content_intent = n.get("hasContentIntent", False)
+        actions = n.get("actions", [])
         
         if title or content:
             display = f"{title}: {content}" if title else content
         else:
             display = f"[{pkg}]"
         
-        display = display[:80] + "..." if len(display) > 80 else display
-        print(f"[{i}] {display}")
+        display = display[:70] + "..." if len(display) > 70 else display
+        
+        action_info = ""
+        if has_content_intent or actions:
+            action_parts = []
+            if has_content_intent:
+                action_parts.append("0=tap")
+            for j, a in enumerate(actions):
+                action_parts.append(f"{j+1}={a.get('title', '?')[:10]}")
+            action_info = f" [actions: {', '.join(action_parts)}]"
+        
+        print(f"[{i}] {display}{action_info}")
 
 
-def clear_notification(idx: int = None):
-    if idx is None:
-        print("Error: termux-notification-remove can only remove Termux-created notifications", file=sys.stderr)
-        print("To remove arbitrary notifications, termux-api needs modification", file=sys.stderr)
+def cancel_notification(key: str = None, pkg: str = None, tag: str = None, id: int = None, cancel_all: bool = False):
+    args = []
+    if cancel_all:
+        args.append("--ez")
+        args.append("all")
+        args.append("true")
+    elif key:
+        args.extend(["--es", "key", key])
+    elif pkg:
+        args.extend(["--es", "pkg", pkg])
+        if tag:
+            args.extend(["--es", "tag", tag])
+        if id is not None:
+            args.extend(["--ei", "id", str(id)])
+    else:
+        print("Error: Specify --key, --pkg, or --all", file=sys.stderr)
         return
     
-    notifications = get_notifications()
-    if idx < 0 or idx >= len(notifications):
-        print(f"Error: Invalid index {idx}", file=sys.stderr)
-        return
-    
-    n = notifications[idx]
-    key = n.get("key", "")
-    pkg = n.get("packageName", "")
-    
-    print(f"Error: Cannot remove notification from {pkg}", file=sys.stderr)
-    print("termux-notification-remove only works for Termux-created notifications", file=sys.stderr)
+    returncode, stdout, stderr = run_termux_api("NotificationCancel", args)
+    print(stdout if stdout else stderr)
 
 
-def pop_notification(idx: int):
-    notifications = get_notifications()
-    if idx < 0 or idx >= len(notifications):
-        print(f"Error: Invalid index {idx}", file=sys.stderr)
-        return
-    
-    n = notifications[idx]
-    key = n.get("key", "")
-    pkg = n.get("packageName", "")
-    title = n.get("title", "")
-    
-    print(f"Error: pop requires termux-api modification", file=sys.stderr)
-    print(f"Would pop: [{idx}] {title} ({pkg})", file=sys.stderr)
+def action_notification(key: str, action_idx: int):
+    args = ["--es", "key", key, "--ei", "action", str(action_idx)]
+    returncode, stdout, stderr = run_termux_api("NotificationAction", args)
+    print(stdout if stdout else stderr)
 
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: notifications <list|pop|clear>")
-        print("  list          Show all notifications")
-        print("  pop <idx>     Tap notification and open (requires termux-api mod)")
-        print("  clear [<idx>] Remove notification (requires termux-api mod)")
+        print("Usage: notifications <command> [args]")
+        print()
+        print("Commands:")
+        print("  list                           List all notifications")
+        print("  cancel --key <key>             Cancel notification by key")
+        print("  cancel --pkg <pkg> [--tag <tag>] [--id <id>]  Cancel by pkg/tag/id")
+        print("  cancel --all                   Cancel all notifications")
+        print("  action <idx> <action>          Fire notification action")
+        print("                                 action 0 = tap (contentIntent)")
+        print("                                 action 1+ = action buttons")
+        print()
+        print("Examples:")
+        print("  notifications list")
+        print("  notifications cancel --key '0|com.whatsapp|123|null|10184'")
+        print("  notifications cancel --all")
+        print("  notifications action 0 0    # Tap notification at index 0")
+        print("  notifications action 1 1    # Fire action button 1 on notification at index 1")
         sys.exit(1)
     
     cmd = sys.argv[1].lower()
     
     if cmd == "list":
         list_notifications()
-    elif cmd == "clear":
-        if len(sys.argv) > 2:
-            try:
-                idx = int(sys.argv[2])
-                clear_notification(idx)
-            except ValueError:
-                print(f"Error: Invalid index '{sys.argv[2]}'", file=sys.stderr)
+    
+    elif cmd == "cancel":
+        args = sys.argv[2:]
+        if "--all" in args:
+            cancel_notification(cancel_all=True)
+        elif "--key" in args:
+            idx = args.index("--key")
+            if idx + 1 < len(args):
+                cancel_notification(key=args[idx + 1])
+            else:
+                print("Error: --key requires a value", file=sys.stderr)
+        elif "--pkg" in args:
+            idx = args.index("--pkg")
+            pkg = args[idx + 1] if idx + 1 < len(args) else None
+            tag = None
+            id_val = None
+            if "--tag" in args:
+                tag_idx = args.index("--tag")
+                tag = args[tag_idx + 1] if tag_idx + 1 < len(args) else None
+            if "--id" in args:
+                id_idx = args.index("--id")
+                id_val = int(args[id_idx + 1]) if id_idx + 1 < len(args) else None
+            cancel_notification(pkg=pkg, tag=tag, id=id_val)
         else:
-            clear_notification()
-    elif cmd == "pop":
-        if len(sys.argv) < 3:
-            print("Error: pop requires an index", file=sys.stderr)
+            print("Error: Specify --key, --pkg, or --all", file=sys.stderr)
+    
+    elif cmd == "action":
+        if len(sys.argv) < 4:
+            print("Error: action requires <notification-idx> <action-idx>", file=sys.stderr)
+            print("  action 0 = tap (contentIntent)", file=sys.stderr)
+            print("  action 1+ = action buttons", file=sys.stderr)
             sys.exit(1)
         try:
-            idx = int(sys.argv[2])
-            pop_notification(idx)
+            notif_idx = int(sys.argv[2])
+            action_idx = int(sys.argv[3])
         except ValueError:
-            print(f"Error: Invalid index '{sys.argv[2]}'", file=sys.stderr)
+            print("Error: Indices must be integers", file=sys.stderr)
+            sys.exit(1)
+        
+        notifications = get_notifications()
+        if notif_idx < 0 or notif_idx >= len(notifications):
+            print(f"Error: Invalid notification index {notif_idx}", file=sys.stderr)
+            sys.exit(1)
+        
+        key = notifications[notif_idx].get("key")
+        if not key:
+            print("Error: Notification has no key", file=sys.stderr)
+            sys.exit(1)
+        
+        action_notification(key, action_idx)
+    
     else:
         print(f"Unknown command: {cmd}", file=sys.stderr)
         sys.exit(1)
