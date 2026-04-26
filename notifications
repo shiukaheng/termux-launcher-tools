@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Notification manager for Termux"""
+
+import json
+import subprocess
+import sys
+
+
+def get_notifications() -> list:
+    try:
+        result = subprocess.run(
+            ["termux-notification-list"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            return []
+        return json.loads(result.stdout)
+    except FileNotFoundError:
+        print("Error: termux-notification-list not found. Install with: pkg install termux-api", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError:
+        return []
+
+
+def list_notifications():
+    notifications = get_notifications()
+    if not notifications:
+        print("No notifications")
+        return
+    
+    for i, n in enumerate(notifications):
+        title = n.get("title", "")
+        content = n.get("content", "")
+        pkg = n.get("packageName", "")
+        when = n.get("when", "")
+        
+        if title or content:
+            display = f"{title}: {content}" if title else content
+        else:
+            display = f"[{pkg}]"
+        
+        display = display[:80] + "..." if len(display) > 80 else display
+        print(f"[{i}] {display}")
+
+
+def clear_notification(idx: int = None):
+    if idx is None:
+        print("Error: termux-notification-remove can only remove Termux-created notifications", file=sys.stderr)
+        print("To remove arbitrary notifications, termux-api needs modification", file=sys.stderr)
+        return
+    
+    notifications = get_notifications()
+    if idx < 0 or idx >= len(notifications):
+        print(f"Error: Invalid index {idx}", file=sys.stderr)
+        return
+    
+    n = notifications[idx]
+    key = n.get("key", "")
+    pkg = n.get("packageName", "")
+    
+    print(f"Error: Cannot remove notification from {pkg}", file=sys.stderr)
+    print("termux-notification-remove only works for Termux-created notifications", file=sys.stderr)
+
+
+def pop_notification(idx: int):
+    notifications = get_notifications()
+    if idx < 0 or idx >= len(notifications):
+        print(f"Error: Invalid index {idx}", file=sys.stderr)
+        return
+    
+    n = notifications[idx]
+    key = n.get("key", "")
+    pkg = n.get("packageName", "")
+    title = n.get("title", "")
+    
+    print(f"Error: pop requires termux-api modification", file=sys.stderr)
+    print(f"Would pop: [{idx}] {title} ({pkg})", file=sys.stderr)
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: notifications <list|pop|clear>")
+        print("  list          Show all notifications")
+        print("  pop <idx>     Tap notification and open (requires termux-api mod)")
+        print("  clear [<idx>] Remove notification (requires termux-api mod)")
+        sys.exit(1)
+    
+    cmd = sys.argv[1].lower()
+    
+    if cmd == "list":
+        list_notifications()
+    elif cmd == "clear":
+        if len(sys.argv) > 2:
+            try:
+                idx = int(sys.argv[2])
+                clear_notification(idx)
+            except ValueError:
+                print(f"Error: Invalid index '{sys.argv[2]}'", file=sys.stderr)
+        else:
+            clear_notification()
+    elif cmd == "pop":
+        if len(sys.argv) < 3:
+            print("Error: pop requires an index", file=sys.stderr)
+            sys.exit(1)
+        try:
+            idx = int(sys.argv[2])
+            pop_notification(idx)
+        except ValueError:
+            print(f"Error: Invalid index '{sys.argv[2]}'", file=sys.stderr)
+    else:
+        print(f"Unknown command: {cmd}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
