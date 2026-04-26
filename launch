@@ -60,7 +60,7 @@ def main():
     if len(matches) == 1 or matches[0]["ratio"] >= 0.8:
         app = matches[0]
         print(f"Launching: {app['label']}")
-        launch_app(app["pkg"])
+        launch_app(app["pkg"], app.get("activity"))
     else:
         print(f"Multiple matches for '{query}':")
         for i, app in enumerate(matches[:3]):
@@ -73,7 +73,7 @@ def main():
                 if idx < len(matches):
                     app = matches[idx]
                     print(f"Launching: {app['label']}")
-                    launch_app(app["pkg"])
+                    launch_app(app["pkg"], app.get("activity"))
         except (EOFError, KeyboardInterrupt):
             print("\nCancelled")
 

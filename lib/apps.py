@@ -27,7 +27,7 @@ def get_all_packages() -> list:
         return []
 
 
-def get_app_label(pkg: str) -> str:
+def get_app_info(pkg: str) -> tuple:
     try:
         path_result = subprocess.run(
             ["pm", "path", pkg],
@@ -35,7 +35,7 @@ def get_app_label(pkg: str) -> str:
             text=True
         )
         if not path_result.stdout.strip():
-            return pkg
+            return pkg, None
         
         apk_path = None
         for line in path_result.stdout.strip().split("\n"):
@@ -44,7 +44,7 @@ def get_app_label(pkg: str) -> str:
                 break
         
         if not apk_path:
-            return pkg
+            return pkg, None
         
         label_result = subprocess.run(
             ["aapt", "dump", "badging", apk_path],
@@ -52,14 +52,24 @@ def get_app_label(pkg: str) -> str:
             text=True
         )
         
+        label = pkg
+        activity = None
+        
         for line in label_result.stdout.split("\n"):
             if line.startswith("application-label:"):
                 label = line.split(":", 1)[1].strip().strip("'")
-                return label
+            elif line.startswith("launchable-activity:"):
+                parts = line.split("'")
+                for i, part in enumerate(parts):
+                    if "name=" in part:
+                        activity = part.split("name=")[1].strip()
+                        break
+                if not activity and "name='" in line:
+                    activity = line.split("name='")[1].split("'")[0]
         
-        return pkg
+        return label, activity
     except Exception:
-        return pkg
+        return pkg, None
 
 
 def index_apps() -> dict:
@@ -68,15 +78,15 @@ def index_apps() -> dict:
     
     total = len(packages)
     for i, pkg in enumerate(packages):
-        label = get_app_label(pkg)
-        apps.append({"pkg": pkg, "label": label})
+        label, activity = get_app_info(pkg)
+        apps.append({"pkg": pkg, "label": label, "activity": activity})
         if (i + 1) % 10 == 0 or i + 1 == total:
             print(f"Indexing: {i + 1}/{total}", end="\r")
     
     print()
     
     index_data = {
-        "version": 1,
+        "version": 2,
         "indexed_at": int(__import__("time").time()),
         "apps": apps
     }
@@ -117,14 +127,21 @@ def search_apps(query: str, index: dict) -> list:
     return results
 
 
-def launch_app(pkg: str) -> bool:
+def launch_app(pkg: str, activity: str = None) -> bool:
     try:
-        subprocess.run(
-            ["am", "start", "-a", "android.intent.action.MAIN",
-             "-c", "android.intent.category.LAUNCHER", pkg],
-            capture_output=True,
-            text=True
-        )
+        if activity:
+            subprocess.run(
+                ["am", "start", "-n", f"{pkg}/{activity}"],
+                capture_output=True,
+                text=True
+            )
+        else:
+            subprocess.run(
+                ["am", "start", "-a", "android.intent.action.MAIN",
+                 "-c", "android.intent.category.LAUNCHER", pkg],
+                capture_output=True,
+                text=True
+            )
         return True
     except Exception:
         return False
