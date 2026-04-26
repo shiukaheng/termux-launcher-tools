@@ -32,7 +32,7 @@ def get_notifications() -> list:
         return []
 
 
-def list_notifications():
+def list_notifications(verbose=False):
     notifications = get_notifications()
     if not notifications:
         print("No notifications")
@@ -42,26 +42,27 @@ def list_notifications():
         title = n.get("title", "")
         content = n.get("content", "")
         pkg = n.get("packageName", "")
-        has_content_intent = n.get("hasContentIntent", False)
-        actions = n.get("actions", [])
         
         if title or content:
             display = f"{title}: {content}" if title else content
         else:
             display = f"[{pkg}]"
         
-        display = display[:70] + "..." if len(display) > 70 else display
+        display = display[:60] + "..." if len(display) > 60 else display
+        print(f"[{i}] {display}")
         
-        action_info = ""
-        if has_content_intent or actions:
-            action_parts = []
-            if has_content_intent:
-                action_parts.append("0=tap")
-            for j, a in enumerate(actions):
-                action_parts.append(f"{j+1}={a.get('title', '?')[:10]}")
-            action_info = f" [actions: {', '.join(action_parts)}]"
-        
-        print(f"[{i}] {display}{action_info}")
+        if verbose:
+            has_content_intent = n.get("hasContentIntent", False)
+            actions = n.get("actions", [])
+            key = n.get("key", "")
+            if has_content_intent or actions:
+                action_parts = []
+                if has_content_intent:
+                    action_parts.append("0=tap")
+                for j, a in enumerate(actions):
+                    action_parts.append(f"{j+1}={a.get('title', '?')[:12]}")
+                print(f"    actions: {', '.join(action_parts)}")
+            print(f"    key: {key}")
 
 
 def cancel_notification(key: str = None, pkg: str = None, tag: str = None, id: int = None, cancel_all: bool = False):
@@ -97,26 +98,23 @@ def main():
         print("Usage: notifications <command> [args]")
         print()
         print("Commands:")
-        print("  list                           List all notifications")
+        print("  list [-v]                      List notifications (-v = show actions/keys)")
         print("  cancel --key <key>             Cancel notification by key")
-        print("  cancel --pkg <pkg> [--tag <tag>] [--id <id>]  Cancel by pkg/tag/id")
         print("  cancel --all                   Cancel all notifications")
-        print("  action <idx> <action>          Fire notification action")
-        print("                                 action 0 = tap (contentIntent)")
-        print("                                 action 1+ = action buttons")
+        print("  action <idx> <action>          Fire action (0=tap, 1+=buttons)")
         print()
         print("Examples:")
         print("  notifications list")
-        print("  notifications cancel --key '0|com.whatsapp|123|null|10184'")
+        print("  notifications list -v")
+        print("  notifications action 0 0       # Tap notification at index 0")
         print("  notifications cancel --all")
-        print("  notifications action 0 0    # Tap notification at index 0")
-        print("  notifications action 1 1    # Fire action button 1 on notification at index 1")
         sys.exit(1)
     
     cmd = sys.argv[1].lower()
     
     if cmd == "list":
-        list_notifications()
+        verbose = "-v" in sys.argv or "--verbose" in sys.argv
+        list_notifications(verbose)
     
     elif cmd == "cancel":
         args = sys.argv[2:]
