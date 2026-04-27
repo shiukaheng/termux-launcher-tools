@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""App indexer and discovery for Termux"""
+
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib.apps import (
+    load_index,
+    index_apps,
+    search_apps,
+    list_apps,
+)
+
+
+def main():
+    args = sys.argv[1:]
+    
+    if not args:
+        index = load_index()
+        if not index:
+            print("No app index found. Run: launchindexer --reindex", file=sys.stderr)
+            sys.exit(1)
+        
+        for app in list_apps(index):
+            print(f"{app['label']} ({app['pkg']})")
+        sys.exit(0)
+    
+    debug = "--debug" in args
+    if debug:
+        args.remove("--debug")
+    
+    if args and args[0] == "--reindex":
+        print("Indexing apps...")
+        index = index_apps(debug=debug)
+        print(f"Indexed {len(index['apps'])} apps")
+        sys.exit(0)
+    
+    if args and args[0] == "--activities":
+        if len(args) < 2:
+            print("Usage: launchindexer --activities <app>", file=sys.stderr)
+            sys.exit(1)
+        
+        index = load_index()
+        if not index:
+            print("No app index found. Run: launchindexer --reindex", file=sys.stderr)
+            sys.exit(1)
+        
+        query = " ".join(args[1:])
+        matches = search_apps(query, index)
+        
+        if not matches:
+            print(f"No apps found matching '{query}'", file=sys.stderr)
+            sys.exit(1)
+        
+        app = matches[0]
+        activities = app.get("activity") or []
+        if isinstance(activities, str):
+            activities = [activities]
+        
+        print(f"Activities for {app['label']}:")
+        if not activities:
+            print("  (no activities indexed)")
+        else:
+            for i, act in enumerate(activities):
+                short_name = act.split(".")[-1] if "." in act else act
+                if debug:
+                    print(f"  [{i + 1}] {short_name} ({act})")
+                else:
+                    print(f"  [{i + 1}] {short_name}")
+        sys.exit(0)
+    
+    if args and args[0] == "--help":
+        print("Usage: launchindexer [options] [query]")
+        print()
+        print("Options:")
+        print("  --reindex       Rebuild app index")
+        print("  --activities <app>  List activities for an app")
+        print("  --debug         Show debug info")
+        print("  --help          Show this help")
+        print()
+        print("With no arguments, lists all apps.")
+        print("With a query, lists matching apps.")
+        sys.exit(0)
+    
+    index = load_index()
+    if not index:
+        print("No app index found. Run: launchindexer --reindex", file=sys.stderr)
+        sys.exit(1)
+    
+    query = " ".join(args)
+    apps = list_apps(index, query)
+    
+    for app in apps:
+        print(f"{app['label']} ({app['pkg']})")
+
+
+if __name__ == "__main__":
+    main()
