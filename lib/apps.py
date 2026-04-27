@@ -1,6 +1,8 @@
 import json
 import os
 import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 
@@ -79,24 +81,36 @@ def get_app_info(pkg: str) -> tuple:
         return pkg, None
 
 
-def index_apps(debug: bool = False) -> dict:
+def index_apps(debug: bool = False, workers: int = 16) -> dict:
     packages = get_all_packages(debug=debug)
     apps = []
     
     total = len(packages)
     if debug:
         print(f"[DEBUG] Total packages to index: {total}")
+        print(f"[DEBUG] Using {workers} worker threads")
         if total == 0:
             print("[DEBUG] No packages found! Check if 'cmd' is accessible.")
             print(f"[DEBUG] PATH: {os.environ.get('PATH', '(not set)')}")
             import shutil
             cmd_path = shutil.which("cmd")
             print(f"[DEBUG] cmd location: {cmd_path}")
-    for i, pkg in enumerate(packages):
+    
+    counter = [0]
+    counter_lock = threading.Lock()
+    
+    def process_package(pkg):
         label, activity = get_app_info(pkg)
-        apps.append({"pkg": pkg, "label": label, "activity": activity})
-        if (i + 1) % 10 == 0 or i + 1 == total:
-            print(f"Indexing: {i + 1}/{total}", end="\r")
+        with counter_lock:
+            counter[0] += 1
+            if counter[0] % 10 == 0 or counter[0] == total:
+                print(f"Indexing: {counter[0]}/{total}", end="\r")
+        return {"pkg": pkg, "label": label, "activity": activity}
+    
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(process_package, pkg) for pkg in packages]
+        for future in as_completed(futures):
+            apps.append(future.result())
     
     print()
     
