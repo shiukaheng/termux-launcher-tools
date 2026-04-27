@@ -128,21 +128,28 @@ def search_apps(query: str, index: dict) -> list:
 
 
 def launch_app(pkg: str, activity: str = None) -> bool:
+    def run_cmd(args):
+        result = subprocess.run(args, capture_output=True, text=True)
+        output = result.stdout + result.stderr
+        if "Error:" in output or "Error type" in output:
+            return False, output
+        return True, output
+    
     try:
         if activity:
-            subprocess.run(
-                ["am", "start", "-n", f"{pkg}/{activity}"],
-                capture_output=True,
-                text=True
-            )
+            success, output = run_cmd(["am", "start", "-n", f"{pkg}/{activity}"])
+            if success:
+                return True
+            if "does not exist" in output or "not found" in output:
+                success, _ = run_cmd(["am", "start", "-a", "android.intent.action.SEARCH", pkg])
+                if success:
+                    return True
         else:
-            subprocess.run(
-                ["am", "start", "-a", "android.intent.action.MAIN",
-                 "-c", "android.intent.category.LAUNCHER", pkg],
-                capture_output=True,
-                text=True
-            )
-        return True
+            success, _ = run_cmd(["am", "start", "-a", "android.intent.action.MAIN",
+                                  "-c", "android.intent.category.LAUNCHER", pkg])
+            if success:
+                return True
+        return False
     except Exception:
         return False
 
