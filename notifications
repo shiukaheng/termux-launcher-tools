@@ -119,11 +119,17 @@ def cancel_notification(key: str = None, cancel_all: bool = False):
         print(stderr if stderr else "Failed to cancel")
 
 
-def action_notification(key: str, action_idx: int):
+def action_notification(key: str, action_idx: int, action_name: str):
     args = ["--es", "key", key, "--ei", "action", str(action_idx)]
     returncode, stdout, stderr = run_termux_api("NotificationAction", args)
-    if returncode != 0 and stderr:
-        print(stderr)
+    if returncode == 0:
+        print(f"Action '{action_name}' sent")
+    elif stderr:
+        print(f"Error: {stderr}", file=sys.stderr)
+        sys.exit(1)
+    else:
+        print("Error: Failed to send action (unknown error)", file=sys.stderr)
+        sys.exit(1)
 
 
 def show_usage():
@@ -174,6 +180,10 @@ def main():
             sys.exit(1)
         
         notifications = get_notifications()
+        if not notifications:
+            print("Error: No notifications available", file=sys.stderr)
+            sys.exit(1)
+        
         if idx < 0 or idx >= len(notifications):
             print(f"Error: Index {idx} out of range (0-{len(notifications)-1})", file=sys.stderr)
             sys.exit(1)
@@ -203,6 +213,10 @@ def main():
         sys.exit(1)
     
     notifications = get_notifications()
+    if not notifications:
+        print("Error: No notifications available", file=sys.stderr)
+        sys.exit(1)
+    
     if idx < 0 or idx >= len(notifications):
         print(f"Error: Index {idx} out of range (0-{len(notifications)-1})", file=sys.stderr)
         sys.exit(1)
@@ -230,7 +244,7 @@ def main():
             print(f"  {title}", file=sys.stderr)
         sys.exit(1)
     
-    action_notification(key, result)
+    action_notification(key, result, action_name)
 
 
 if __name__ == "__main__":
