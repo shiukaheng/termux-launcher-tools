@@ -51,63 +51,102 @@ def list_notifications(verbose=False):
         display = display[:60] + "..." if len(display) > 60 else display
         print(f"[{i}] {display}")
         
+        actions = n.get("actions", [])
+        has_content_intent = n.get("hasContentIntent", False)
+        
         if verbose:
-            has_content_intent = n.get("hasContentIntent", False)
-            actions = n.get("actions", [])
             key = n.get("key", "")
-            if has_content_intent or actions:
-                action_parts = []
-                if has_content_intent:
-                    action_parts.append("0=tap")
-                for j, a in enumerate(actions):
-                    action_parts.append(f"{j+1}={a.get('title', '?')[:12]}")
-                print(f"    actions: {', '.join(action_parts)}")
+            print(f"    package: {pkg}")
             print(f"    key: {key}")
+            if actions or has_content_intent:
+                action_list = []
+                if has_content_intent:
+                    action_list.append("tap")
+                for a in actions:
+                    action_list.append(a.get("title", "?").lower())
+                print(f"    actions: {', '.join(action_list)}")
+        else:
+            if actions or has_content_intent:
+                action_list = []
+                if has_content_intent:
+                    action_list.append("tap")
+                for a in actions:
+                    title = a.get("title", "?")
+                    action_list.append(f"[{title.lower()}]")
+                print(f"    {' '.join(action_list)}")
 
 
-def cancel_notification(key: str = None, pkg: str = None, tag: str = None, id: int = None, cancel_all: bool = False):
+def find_action(action_name: str, notification: dict) -> int:
+    action_name = action_name.lower()
+    
+    if action_name == "tap":
+        if notification.get("hasContentIntent", False):
+            return 0
+        return None
+    
+    actions = notification.get("actions", [])
+    matches = []
+    
+    for i, a in enumerate(actions):
+        title = a.get("title", "").lower()
+        if title == action_name:
+            return i + 1
+        if action_name in title or title in action_name:
+            matches.append((i + 1, title))
+    
+    if len(matches) == 1:
+        return matches[0][0]
+    elif len(matches) > 1:
+        return matches
+    
+    return None
+
+
+def cancel_notification(key: str = None, cancel_all: bool = False):
     args = []
     if cancel_all:
-        args.append("--ez")
-        args.append("all")
-        args.append("true")
+        args.extend(["--ez", "all", "true"])
     elif key:
         args.extend(["--es", "key", key])
-    elif pkg:
-        args.extend(["--es", "pkg", pkg])
-        if tag:
-            args.extend(["--es", "tag", tag])
-        if id is not None:
-            args.extend(["--ei", "id", str(id)])
     else:
-        print("Error: Specify --key, --pkg, or --all", file=sys.stderr)
+        print("Error: No key specified", file=sys.stderr)
         return
     
     returncode, stdout, stderr = run_termux_api("NotificationCancel", args)
-    print(stdout if stdout else stderr)
+    if returncode == 0:
+        print("Cancelled")
+    else:
+        print(stderr if stderr else "Failed to cancel")
 
 
 def action_notification(key: str, action_idx: int):
     args = ["--es", "key", key, "--ei", "action", str(action_idx)]
     returncode, stdout, stderr = run_termux_api("NotificationAction", args)
-    print(stdout if stdout else stderr)
+    if returncode != 0 and stderr:
+        print(stderr)
+
+
+def show_usage():
+    print("Usage: notifications <command> [args]")
+    print()
+    print("Commands:")
+    print("  list [-v]              List notifications")
+    print("  tap <idx>              Tap notification")
+    print("  cancel <idx|--all>     Cancel notification(s)")
+    print("  <action> <idx>         Fire action on notification")
+    print()
+    print("Examples:")
+    print("  notifications list")
+    print("  notifications list -v")
+    print("  notifications tap 1")
+    print("  notifications reply 1")
+    print("  notifications cancel 1")
+    print("  notifications cancel --all")
 
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: notifications <command> [args]")
-        print()
-        print("Commands:")
-        print("  list [-v]                      List notifications (-v = show actions/keys)")
-        print("  cancel --key <key>             Cancel notification by key")
-        print("  cancel --all                   Cancel all notifications")
-        print("  action <idx> <action>          Fire action (0=tap, 1+=buttons)")
-        print()
-        print("Examples:")
-        print("  notifications list")
-        print("  notifications list -v")
-        print("  notifications action 0 0       # Tap notification at index 0")
-        print("  notifications cancel --all")
+        show_usage()
         sys.exit(1)
     
     cmd = sys.argv[1].lower()
@@ -115,60 +154,81 @@ def main():
     if cmd == "list":
         verbose = "-v" in sys.argv or "--verbose" in sys.argv
         list_notifications(verbose)
+        return
     
-    elif cmd == "cancel":
-        args = sys.argv[2:]
-        if "--all" in args:
-            cancel_notification(cancel_all=True)
-        elif "--key" in args:
-            idx = args.index("--key")
-            if idx + 1 < len(args):
-                cancel_notification(key=args[idx + 1])
-            else:
-                print("Error: --key requires a value", file=sys.stderr)
-        elif "--pkg" in args:
-            idx = args.index("--pkg")
-            pkg = args[idx + 1] if idx + 1 < len(args) else None
-            tag = None
-            id_val = None
-            if "--tag" in args:
-                tag_idx = args.index("--tag")
-                tag = args[tag_idx + 1] if tag_idx + 1 < len(args) else None
-            if "--id" in args:
-                id_idx = args.index("--id")
-                id_val = int(args[id_idx + 1]) if id_idx + 1 < len(args) else None
-            cancel_notification(pkg=pkg, tag=tag, id=id_val)
-        else:
-            print("Error: Specify --key, --pkg, or --all", file=sys.stderr)
-    
-    elif cmd == "action":
-        if len(sys.argv) < 4:
-            print("Error: action requires <notification-idx> <action-idx>", file=sys.stderr)
-            print("  action 0 = tap (contentIntent)", file=sys.stderr)
-            print("  action 1+ = action buttons", file=sys.stderr)
+    if cmd == "cancel":
+        if len(sys.argv) < 3:
+            print("Error: cancel requires an index or --all", file=sys.stderr)
             sys.exit(1)
+        
+        if sys.argv[2] == "--all":
+            cancel_notification(cancel_all=True)
+            return
+        
         try:
-            notif_idx = int(sys.argv[2])
-            action_idx = int(sys.argv[3])
+            idx = int(sys.argv[2])
         except ValueError:
-            print("Error: Indices must be integers", file=sys.stderr)
+            print(f"Error: Invalid index '{sys.argv[2]}'", file=sys.stderr)
             sys.exit(1)
         
         notifications = get_notifications()
-        if notif_idx < 0 or notif_idx >= len(notifications):
-            print(f"Error: Invalid notification index {notif_idx}", file=sys.stderr)
+        if idx < 0 or idx >= len(notifications):
+            print(f"Error: Index {idx} out of range (0-{len(notifications)-1})", file=sys.stderr)
             sys.exit(1)
         
-        key = notifications[notif_idx].get("key")
+        key = notifications[idx].get("key")
         if not key:
             print("Error: Notification has no key", file=sys.stderr)
             sys.exit(1)
         
-        action_notification(key, action_idx)
+        cancel_notification(key=key)
+        return
     
-    else:
-        print(f"Unknown command: {cmd}", file=sys.stderr)
+    if cmd == "--help" or cmd == "-h":
+        show_usage()
+        return
+    
+    action_name = cmd
+    
+    if len(sys.argv) < 3:
+        print(f"Error: '{action_name}' requires a notification index", file=sys.stderr)
         sys.exit(1)
+    
+    try:
+        idx = int(sys.argv[2])
+    except ValueError:
+        print(f"Error: Invalid index '{sys.argv[2]}'", file=sys.stderr)
+        sys.exit(1)
+    
+    notifications = get_notifications()
+    if idx < 0 or idx >= len(notifications):
+        print(f"Error: Index {idx} out of range (0-{len(notifications)-1})", file=sys.stderr)
+        sys.exit(1)
+    
+    n = notifications[idx]
+    key = n.get("key")
+    if not key:
+        print("Error: Notification has no key", file=sys.stderr)
+        sys.exit(1)
+    
+    result = find_action(action_name, n)
+    
+    if result is None:
+        actions = n.get("actions", [])
+        available = ["tap"] if n.get("hasContentIntent") else []
+        available.extend(a.get("title", "?").lower() for a in actions)
+        print(f"Error: Action '{action_name}' not found", file=sys.stderr)
+        print(f"Available: {', '.join(available)}", file=sys.stderr)
+        sys.exit(1)
+    
+    if isinstance(result, list):
+        print(f"Error: Ambiguous action '{action_name}'", file=sys.stderr)
+        print("Matches:", file=sys.stderr)
+        for action_idx, title in result:
+            print(f"  {title}", file=sys.stderr)
+        sys.exit(1)
+    
+    action_notification(key, result)
 
 
 if __name__ == "__main__":
