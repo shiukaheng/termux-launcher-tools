@@ -12,37 +12,41 @@ def get_app_index_path() -> Path:
 
 
 def get_all_packages(debug: bool = False) -> list:
-    cmd = ["pm", "list", "packages", "--user", "0"]
-    if debug:
-        print(f"[DEBUG] Running: {' '.join(cmd)}")
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+    for cmd_name in ["cmd package", "pm"]:
+        cmd = f"{cmd_name} list packages --user 0".split()
         if debug:
-            print(f"[DEBUG] Return code: {result.returncode}")
-            print(f"[DEBUG] stdout length: {len(result.stdout)}")
-            print(f"[DEBUG] stdout first 200 chars: {result.stdout[:200]}")
-            print(f"[DEBUG] stderr: {result.stderr[:200] if result.stderr else '(empty)'}")
-        packages = []
-        for line in result.stdout.strip().split("\n"):
-            if line.startswith("package:"):
-                packages.append(line[8:])
-        if debug:
-            print(f"[DEBUG] Parsed {len(packages)} packages")
-        return packages
-    except FileNotFoundError as e:
-        if debug:
-            print(f"[DEBUG] FileNotFoundError: {e}")
-        return []
+            print(f"[DEBUG] Trying: {' '.join(cmd)}")
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if debug:
+                print(f"[DEBUG] Return code: {result.returncode}")
+                print(f"[DEBUG] stderr: {result.stderr[:200] if result.stderr else '(empty)'}")
+            if result.returncode == 0 and result.stdout.strip():
+                packages = []
+                for line in result.stdout.strip().split("\n"):
+                    if line.startswith("package:"):
+                        packages.append(line[8:])
+                if debug:
+                    print(f"[DEBUG] Success with '{cmd_name}', found {len(packages)} packages")
+                return packages
+            elif debug:
+                print(f"[DEBUG] stdout: {result.stdout[:200]}")
+        except FileNotFoundError as e:
+            if debug:
+                print(f"[DEBUG] FileNotFoundError: {e}")
+            continue
+    return []
 
 
 def get_app_info(pkg: str) -> tuple:
     try:
-        path_result = subprocess.run(
-            ["pm", "path", pkg],
-            capture_output=True,
-            text=True
-        )
-        if not path_result.stdout.strip():
+        path_result = None
+        for cmd_name in ["cmd package", "pm"]:
+            cmd = f"{cmd_name} path {pkg}".split()
+            path_result = subprocess.run(cmd, capture_output=True, text=True)
+            if path_result.returncode == 0 and path_result.stdout.strip():
+                break
+        if not path_result or not path_result.stdout.strip():
             return pkg, None
         
         apk_path = None
