@@ -66,7 +66,10 @@ def main():
         print(f"Launching: {app['label']}")
         if debug:
             print(f"[DEBUG] Package: {app['pkg']}")
-            print(f"[DEBUG] Activity: {app.get('activity')}")
+            activities = app.get("activity") or []
+            if isinstance(activities, str):
+                activities = [activities]
+            print(f"[DEBUG] Activities: {activities}")
         launch_app(app["pkg"], app.get("activity"), debug=debug)
     else:
         print(f"Multiple matches for '{query}':")

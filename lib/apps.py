@@ -110,9 +110,8 @@ def get_app_info(pkg: str) -> tuple:
         )
         
         activities = parse_launcher_activities(xmltree_result.stdout)
-        activity = activities[0] if activities else None
         
-        return label, activity
+        return label, activities
     except Exception:
         return pkg, None
 
@@ -151,7 +150,7 @@ def index_apps(debug: bool = False, workers: int = 16) -> dict:
     print()
     
     index_data = {
-        "version": 2,
+        "version": 3,
         "indexed_at": int(__import__("time").time()),
         "apps": apps
     }
@@ -192,7 +191,7 @@ def search_apps(query: str, index: dict) -> list:
     return results
 
 
-def launch_app(pkg: str, activity: str = None, debug: bool = False) -> bool:
+def launch_app(pkg: str, activities=None, debug: bool = False) -> bool:
     def run_cmd(args):
         if debug:
             print(f"[DEBUG] Running: {' '.join(args)}")
@@ -206,24 +205,27 @@ def launch_app(pkg: str, activity: str = None, debug: bool = False) -> bool:
             return False, output
         return True, output
     
+    if activities is None:
+        activities = []
+    elif isinstance(activities, str):
+        activities = [activities]
+    
     try:
-        if activity:
+        for activity in activities:
             success, output = run_cmd(["am", "start", "-n", f"{pkg}/{activity}"])
             if success:
                 return True
-            if "does not exist" in output or "not found" in output:
-                if debug:
-                    print("[DEBUG] Activity not found, trying common activity patterns")
-                for suffix in ["/.SearchActivity", "/.MainActivity", "/.Main"]:
-                    success, _ = run_cmd(["am", "start", "-n", f"{pkg}{suffix}"])
-                    if success:
-                        return True
-        else:
-            success, _ = run_cmd(["am", "start", "-a", "android.intent.action.MAIN",
-                                  "-c", "android.intent.category.LAUNCHER", pkg])
-            if success:
-                return True
-        return False
+            if "does not exist" not in output and "not found" not in output:
+                return False
+            if debug:
+                print(f"[DEBUG] Activity {activity} not found, trying next")
+        
+        if debug and activities:
+            print("[DEBUG] No activities found, trying package launch")
+        
+        success, _ = run_cmd(["am", "start", "-a", "android.intent.action.MAIN",
+                              "-c", "android.intent.category.LAUNCHER", pkg])
+        return success
     except Exception as e:
         if debug:
             print(f"[DEBUG] Exception: {e}")
