@@ -159,16 +159,18 @@ def main():
     if cmd == "cancel":
         if len(sys.argv) < 3:
             print("Error: cancel requires an index or --all", file=sys.stderr)
+            print("Usage: notifications cancel <idx|--all>", file=sys.stderr)
             sys.exit(1)
         
-        if sys.argv[2] == "--all":
+        arg = sys.argv[2]
+        if arg == "--all":
             cancel_notification(cancel_all=True)
             return
         
         try:
-            idx = int(sys.argv[2])
+            idx = int(arg)
         except ValueError:
-            print(f"Error: Invalid index '{sys.argv[2]}'", file=sys.stderr)
+            print(f"Error: Invalid index '{arg}'", file=sys.stderr)
             sys.exit(1)
         
         notifications = get_notifications()
