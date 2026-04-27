@@ -178,7 +178,7 @@ def launch_app(pkg: str, activity: str = None, debug: bool = False) -> bool:
             if "does not exist" in output or "not found" in output:
                 if debug:
                     print("[DEBUG] Activity not found, trying common activity patterns")
-                for suffix in [".SearchActivity", ".MainActivity", ".Main"]:
+                for suffix in ["/.SearchActivity", "/.MainActivity", "/.Main"]:
                     success, _ = run_cmd(["am", "start", "-n", f"{pkg}{suffix}"])
                     if success:
                         return True
