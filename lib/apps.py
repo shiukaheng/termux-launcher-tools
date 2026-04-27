@@ -156,10 +156,16 @@ def search_apps(query: str, index: dict) -> list:
     return results
 
 
-def launch_app(pkg: str, activity: str = None) -> bool:
+def launch_app(pkg: str, activity: str = None, debug: bool = False) -> bool:
     def run_cmd(args):
+        if debug:
+            print(f"[DEBUG] Running: {' '.join(args)}")
         result = subprocess.run(args, capture_output=True, text=True)
         output = result.stdout + result.stderr
+        if debug:
+            print(f"[DEBUG] Return code: {result.returncode}")
+            print(f"[DEBUG] stdout: {result.stdout[:200] if result.stdout else '(empty)'}")
+            print(f"[DEBUG] stderr: {result.stderr[:200] if result.stderr else '(empty)'}")
         if "Error:" in output or "Error type" in output:
             return False, output
         return True, output
@@ -179,7 +185,9 @@ def launch_app(pkg: str, activity: str = None) -> bool:
             if success:
                 return True
         return False
-    except Exception:
+    except Exception as e:
+        if debug:
+            print(f"[DEBUG] Exception: {e}")
         return False
 
 
