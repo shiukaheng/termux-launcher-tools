@@ -10,7 +10,8 @@ This repo provides command-line tools for controlling an Android phone via Termu
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `launch` | `l` | Fuzzy app launcher with indexing |
+| `launch` | `l` | Fuzzy app launcher |
+| `launchindexer` | - | App indexing and discovery |
 | `music` | `m` | System media control (play/pause/next/prev) |
 | `notifications` | `n` | Notification manager (list/cancel/action) |
 | `status` | `s` | System status (battery/network/storage/memory/uptime) |
@@ -22,6 +23,7 @@ This repo provides command-line tools for controlling an Android phone via Termu
 ```
 termux-launcher-tools/
 ├── launch          # Fuzzy app launcher
+├── launchindexer   # App indexing and discovery
 ├── music           # Media control via cmd media_session
 ├── notifications   # Notification manager via termux-api
 ├── status          # System status display
@@ -54,27 +56,39 @@ Build and install the modified APK from `termux-api/app/build/outputs/apk/debug/
 ## Usage Examples
 
 ```
-launch chrome          # Launch Chrome
-launch chatgpt         # Launch ChatGPT (fuzzy match)
-launch --reindex      # Rebuild app index
-launch --list googl   # List apps matching "googl"
+# App launching
+launch chrome              # Launch Chrome
+launch chatgpt             # Launch ChatGPT (fuzzy match)
+launch google -a 2         # Launch Google with activity #2
+launch google -a SearchActivity  # Launch by activity name
 
-music toggle          # Play/pause toggle
-music next            # Next track
-music volume          # Show volume
+# App discovery
+launchindexer              # List all apps
+launchindexer googl        # List apps matching "googl"
+launchindexer --activities google  # List activities for Google
+launchindexer --reindex    # Rebuild app index
 
-notifications list    # List all notifications
-notifications list -v # Verbose (show actions/keys)
-notifications action 0 0  # Tap notification [0]
+# Media control
+music toggle               # Play/pause toggle
+music next                 # Next track
+music volume               # Show volume
+
+# Notifications
+notifications list         # List all notifications
+notifications list -v      # Verbose (show actions/keys)
+notifications action 0 0   # Tap notification [0]
 notifications cancel --all # Clear all notifications
 
-status                # Show system status
+# System
+status                     # Show system status
 
-compass               # Launch compass (north mode)
-compass london        # Navigate to London
-compass "New York"    # Navigate to New York
+# Compass
+compass                    # Launch compass (north mode)
+compass london             # Navigate to London
+compass "New York"         # Navigate to New York
 
-update                # Pull latest from GitHub
+# Self-update
+update                     # Pull latest from GitHub
 ```
 
 ## Setup
@@ -84,6 +98,7 @@ update                # Pull latest from GitHub
    ```
    export PATH="$HOME/repos/termux-launcher-tools:$PATH"
    alias l="launch"
+   alias li="launchindexer"
    alias n="notifications"
    alias m="music"
    alias s="status"
@@ -91,7 +106,7 @@ update                # Pull latest from GitHub
    alias x="exit"
    alias c="clear"
    ```
-3. Run `launch --reindex` to build app index
+3. Run `launchindexer --reindex` to build app index
 4. Install modified termux-api APK for notification features
 
 ## Related Repos
