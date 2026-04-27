@@ -12,41 +12,36 @@ def get_app_index_path() -> Path:
 
 
 def get_all_packages(debug: bool = False) -> list:
-    for cmd_name in ["cmd package", "pm"]:
-        cmd = f"{cmd_name} list packages --user 0".split()
+    cmd = ["cmd", "package", "list", "packages"]
+    if debug:
+        print(f"[DEBUG] Running: {' '.join(cmd)}")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if debug:
-            print(f"[DEBUG] Trying: {' '.join(cmd)}")
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if debug:
-                print(f"[DEBUG] Return code: {result.returncode}")
-                print(f"[DEBUG] stderr: {result.stderr[:200] if result.stderr else '(empty)'}")
-            if result.returncode == 0 and result.stdout.strip():
-                packages = []
-                for line in result.stdout.strip().split("\n"):
-                    if line.startswith("package:"):
-                        packages.append(line[8:])
-                if debug:
-                    print(f"[DEBUG] Success with '{cmd_name}', found {len(packages)} packages")
-                return packages
-            elif debug:
-                print(f"[DEBUG] stdout: {result.stdout[:200]}")
-        except FileNotFoundError as e:
-            if debug:
-                print(f"[DEBUG] FileNotFoundError: {e}")
-            continue
-    return []
+            print(f"[DEBUG] Return code: {result.returncode}")
+            print(f"[DEBUG] stdout length: {len(result.stdout)}")
+            print(f"[DEBUG] stderr: {result.stderr[:200] if result.stderr else '(empty)'}")
+        packages = []
+        for line in result.stdout.strip().split("\n"):
+            if line.startswith("package:"):
+                packages.append(line[8:])
+        if debug:
+            print(f"[DEBUG] Found {len(packages)} packages")
+        return packages
+    except FileNotFoundError as e:
+        if debug:
+            print(f"[DEBUG] FileNotFoundError: {e}")
+        return []
 
 
 def get_app_info(pkg: str) -> tuple:
     try:
-        path_result = None
-        for cmd_name in ["cmd package", "pm"]:
-            cmd = f"{cmd_name} path {pkg}".split()
-            path_result = subprocess.run(cmd, capture_output=True, text=True)
-            if path_result.returncode == 0 and path_result.stdout.strip():
-                break
-        if not path_result or not path_result.stdout.strip():
+        path_result = subprocess.run(
+            ["cmd", "package", "path", pkg],
+            capture_output=True,
+            text=True
+        )
+        if not path_result.stdout.strip():
             return pkg, None
         
         apk_path = None
@@ -92,11 +87,11 @@ def index_apps(debug: bool = False) -> dict:
     if debug:
         print(f"[DEBUG] Total packages to index: {total}")
         if total == 0:
-            print("[DEBUG] No packages found! Check if 'pm' command is accessible.")
+            print("[DEBUG] No packages found! Check if 'cmd' is accessible.")
             print(f"[DEBUG] PATH: {os.environ.get('PATH', '(not set)')}")
             import shutil
-            pm_path = shutil.which("pm")
-            print(f"[DEBUG] pm location: {pm_path}")
+            cmd_path = shutil.which("cmd")
+            print(f"[DEBUG] cmd location: {cmd_path}")
     for i, pkg in enumerate(packages):
         label, activity = get_app_info(pkg)
         apps.append({"pkg": pkg, "label": label, "activity": activity})
