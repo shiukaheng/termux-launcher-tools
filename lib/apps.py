@@ -37,6 +37,42 @@ def get_all_packages(debug: bool = False) -> list:
 
 
 def get_app_info(pkg: str) -> tuple:
+    def parse_launcher_activities(xmltree_output):
+        activities = []
+        lines = xmltree_output.split("\n")
+        
+        current_activity = None
+        current_enabled = True
+        has_main = False
+        has_launcher = False
+        
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("E: activity") or stripped.startswith("E: activity-alias"):
+                if current_activity and has_main and has_launcher and current_enabled:
+                    activities.append(current_activity)
+                current_activity = None
+                current_enabled = True
+                has_main = False
+                has_launcher = False
+            elif "android:name(0x01010003)=" in line and current_activity is None:
+                match = line.split('"')
+                if len(match) > 1:
+                    name = match[1]
+                    if "android.intent.action.MAIN" not in name and "android.intent.category.LAUNCHER" not in name:
+                        current_activity = name
+            elif "android:enabled(0x0101000e)=(type 0x12)0x0" in line:
+                current_enabled = False
+            elif "android.intent.action.MAIN" in line:
+                has_main = True
+            elif "android.intent.category.LAUNCHER" in line:
+                has_launcher = True
+        
+        if current_activity and has_main and has_launcher and current_enabled:
+            activities.append(current_activity)
+        
+        return activities
+    
     try:
         path_result = subprocess.run(
             ["cmd", "package", "path", pkg],
@@ -62,19 +98,19 @@ def get_app_info(pkg: str) -> tuple:
         )
         
         label = pkg
-        activity = None
-        
         for line in label_result.stdout.split("\n"):
             if line.startswith("application-label:"):
                 label = line.split(":", 1)[1].strip().strip("'")
-            elif line.startswith("launchable-activity:"):
-                parts = line.split("'")
-                for i, part in enumerate(parts):
-                    if "name=" in part:
-                        activity = part.split("name=")[1].strip()
-                        break
-                if not activity and "name='" in line:
-                    activity = line.split("name='")[1].split("'")[0]
+                break
+        
+        xmltree_result = subprocess.run(
+            ["aapt", "dump", "xmltree", apk_path, "AndroidManifest.xml"],
+            capture_output=True,
+            text=True
+        )
+        
+        activities = parse_launcher_activities(xmltree_result.stdout)
+        activity = activities[0] if activities else None
         
         return label, activity
     except Exception:
