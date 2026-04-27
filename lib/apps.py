@@ -177,12 +177,14 @@ def launch_app(pkg: str, activity: str = None, debug: bool = False) -> bool:
                 return True
             if "does not exist" in output or "not found" in output:
                 if debug:
-                    print("[DEBUG] Activity not found, trying package-only launch")
-                success, _ = run_cmd(["am", "start", pkg])
-                if success:
-                    return True
+                    print("[DEBUG] Activity not found, trying common activity patterns")
+                for suffix in [".SearchActivity", ".MainActivity", ".Main"]:
+                    success, _ = run_cmd(["am", "start", "-n", f"{pkg}{suffix}"])
+                    if success:
+                        return True
         else:
-            success, _ = run_cmd(["am", "start", pkg])
+            success, _ = run_cmd(["am", "start", "-a", "android.intent.action.MAIN",
+                                  "-c", "android.intent.category.LAUNCHER", pkg])
             if success:
                 return True
         return False
