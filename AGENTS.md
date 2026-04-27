@@ -75,9 +75,11 @@ music volume               # Show volume
 
 # Notifications
 notifications list         # List all notifications
-notifications list -v      # Verbose (show actions/keys)
-notifications action 0 0   # Tap notification [0]
-notifications cancel --all # Clear all notifications
+notifications list -v      # Verbose (show keys, packages)
+notifications tap 1        # Tap notification 1
+notifications reply 1      # Fire "reply" action on notification 1
+notifications cancel 1     # Cancel notification 1
+notifications cancel --all # Cancel all notifications
 
 # System
 status                     # Show system status
