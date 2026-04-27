@@ -21,13 +21,17 @@ def main():
     
     if not args:
         print("Usage: launch <app name>")
-        print("       launch --reindex")
+        print("       launch --reindex [--debug]")
         print("       launch --list [filter]")
         sys.exit(1)
     
+    debug = "--debug" in args
+    if debug:
+        args.remove("--debug")
+    
     if args[0] == "--reindex":
         print("Indexing apps...")
-        index = index_apps()
+        index = index_apps(debug=debug)
         print(f"Indexed {len(index['apps'])} apps")
         sys.exit(0)
     

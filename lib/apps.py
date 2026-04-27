@@ -11,19 +11,27 @@ def get_app_index_path() -> Path:
     return data_dir / "apps.json"
 
 
-def get_all_packages() -> list:
+def get_all_packages(debug: bool = False) -> list:
+    cmd = ["pm", "list", "packages", "--user", "0"]
+    if debug:
+        print(f"[DEBUG] Running: {' '.join(cmd)}")
     try:
-        result = subprocess.run(
-            ["pm", "list", "packages", "--user", "0"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if debug:
+            print(f"[DEBUG] Return code: {result.returncode}")
+            print(f"[DEBUG] stdout length: {len(result.stdout)}")
+            print(f"[DEBUG] stdout first 200 chars: {result.stdout[:200]}")
+            print(f"[DEBUG] stderr: {result.stderr[:200] if result.stderr else '(empty)'}")
         packages = []
         for line in result.stdout.strip().split("\n"):
             if line.startswith("package:"):
                 packages.append(line[8:])
+        if debug:
+            print(f"[DEBUG] Parsed {len(packages)} packages")
         return packages
-    except FileNotFoundError:
+    except FileNotFoundError as e:
+        if debug:
+            print(f"[DEBUG] FileNotFoundError: {e}")
         return []
 
 
@@ -72,11 +80,19 @@ def get_app_info(pkg: str) -> tuple:
         return pkg, None
 
 
-def index_apps() -> dict:
-    packages = get_all_packages()
+def index_apps(debug: bool = False) -> dict:
+    packages = get_all_packages(debug=debug)
     apps = []
     
     total = len(packages)
+    if debug:
+        print(f"[DEBUG] Total packages to index: {total}")
+        if total == 0:
+            print("[DEBUG] No packages found! Check if 'pm' command is accessible.")
+            print(f"[DEBUG] PATH: {os.environ.get('PATH', '(not set)')}")
+            import shutil
+            pm_path = shutil.which("pm")
+            print(f"[DEBUG] pm location: {pm_path}")
     for i, pkg in enumerate(packages):
         label, activity = get_app_info(pkg)
         apps.append({"pkg": pkg, "label": label, "activity": activity})
