@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+"""Volume control wrapper for termux-volume with better UX"""
+
+import json
+import subprocess
+import sys
+
+TERMUX_API = "/data/data/com.termux/files/usr/libexec/termux-api"
+
+STREAMS = ["alarm", "call", "music", "notification", "ring", "system"]
+DEFAULT_STREAM = "music"
+
+
+def run_termux_volume(stream=None, volume=None):
+    cmd = [TERMUX_API, "Volume"]
+    if stream and volume is not None:
+        subprocess.run(cmd + [stream, str(volume)], check=True)
+        return get_stream_info(stream)
+    elif stream:
+        return get_stream_info(stream)
+    else:
+        return get_all_streams()
+
+
+def get_all_streams():
+    result = subprocess.run([TERMUX_API, "Volume"], capture_output=True, text=True)
+    if result.returncode != 0:
+        return []
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return []
+
+
+def get_stream_info(stream):
+    streams = get_all_streams()
+    for s in streams:
+        if s.get("stream") == stream:
+            return s
+    return None
+
+
+def print_volume_bar(stream_info, width=10):
+    vol = stream_info.get("volume", 0)
+    max_vol = stream_info.get("max_volume", 15)
+    name = stream_info.get("stream", "?")
+    
+    if max_vol == 0:
+        filled = 0
+    else:
+        filled = int((vol / max_vol) * width)
+    
+    bar = "#" * filled + " " * (width - filled)
+    print(f"{name:<4} [{bar}] {vol}/{max_vol}")
+
+
+def print_all():
+    streams = get_all_streams()
+    if not streams:
+        print("No volume info available")
+        return
+    for s in streams:
+        print_volume_bar(s)
+
+
+def print_one(stream):
+    info = get_stream_info(stream)
+    if info:
+        print_volume_bar(info)
+    else:
+        print(f"Unknown stream: {stream}")
+
+
+def set_volume(stream, value):
+    info = get_stream_info(stream)
+    if not info:
+        print(f"Unknown stream: {stream}")
+        return
+    
+    max_vol = info.get("max_volume", 15)
+    value = max(0, min(int(value), max_vol))
+    
+    run_termux_volume(stream, value)
+    print_volume_bar(get_stream_info(stream))
+
+
+def adjust_volume(stream, delta):
+    info = get_stream_info(stream)
+    if not info:
+        print(f"Unknown stream: {stream}")
+        return
+    
+    current = info.get("volume", 0)
+    max_vol = info.get("max_volume", 15)
+    new_val = max(0, min(current + delta, max_vol))
+    
+    run_termux_volume(stream, new_val)
+    print_volume_bar(get_stream_info(stream))
+
+
+def print_help():
+    print("""Usage: volume <command> [args]
+
+Commands:
+  list                  List all streams with volume bars
+  <stream>              Show volume for stream
+  <stream> <N>          Set absolute volume (0 to max)
+  <stream> up [N]       Increment by N (default 1)
+  <stream> down [N]     Decrement by N (default 1)
+  up [N]                Increment music (default stream)
+  down [N]              Decrement music (default stream)
+
+Streams: alarm, call, music, notification, ring, system
+
+Examples:
+  volume list
+  volume music
+  volume music 10
+  volume music up
+  volume music down 2
+  volume up 3""")
+
+
+def main():
+    args = sys.argv[1:]
+    
+    if not args or args[0] in ["-h", "--help", "help"]:
+        print_help()
+        return
+    
+    cmd = args[0]
+    
+    if cmd == "list":
+        print_all()
+        return
+    
+    if cmd == "up":
+        delta = int(args[1]) if len(args) > 1 else 1
+        adjust_volume(DEFAULT_STREAM, delta)
+        return
+    
+    if cmd == "down":
+        delta = -int(args[1]) if len(args) > 1 else -1
+        adjust_volume(DEFAULT_STREAM, delta)
+        return
+    
+    if cmd in STREAMS:
+        if len(args) == 1:
+            print_one(cmd)
+            return
+        
+        sub = args[1]
+        if sub == "up":
+            delta = int(args[2]) if len(args) > 2 else 1
+            adjust_volume(cmd, delta)
+        elif sub == "down":
+            delta = -int(args[2]) if len(args) > 2 else -1
+            adjust_volume(cmd, delta)
+        else:
+            try:
+                set_volume(cmd, int(sub))
+            except ValueError:
+                print(f"Invalid volume: {sub}")
+    else:
+        print(f"Unknown stream: {cmd}")
+        print(f"Streams: {, .join(STREAMS)}")
+
+
+if __name__ == "__main__":
+    main()
