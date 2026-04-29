@@ -40,10 +40,9 @@ System:
   ~/repos/termux-launcher-tools/update - Update tools from GitHub
 
 Web Search:
-  timeout 10 ddgr --json -n 8 "<query>" | jq -r '.[] | {title: .title, url: .url, snippet: (.abstract // "")}' - Search DuckDuckGo (8 results, JSON output, 10s timeout)
-  timeout 10 ddgr -n 5 "<query>" - Search with text output (5 results, 10s timeout)
+  ddgr --json -n 8 "<query>" - Search DuckDuckGo (8 results, JSON output)
   termux-open-url <url> - Open URL in browser
-  NOTE: ALWAYS use 'timeout 10' with ddgr to prevent hangs. --json implies non-interactive.
+  NOTE: ALWAYS use --json flag. Without it, ddgr enters interactive mode and hangs waiting for input.
 
 Navigation:
   ~/repos/termux-launcher-tools/compass - Launch compass app
