@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 from openai import OpenAI
+from datetime import datetime
 
 API_ENDPOINT = os.environ.get("API_ENDPOINT", "https://api.openai.com/v1")
 API_KEY = os.environ.get("API_KEY", "")
@@ -37,6 +38,35 @@ def load_preprompt() -> str:
             return f.read()
     except FileNotFoundError:
         return ""
+
+
+def get_dynamic_context() -> str:
+    now = datetime.now()
+    date_str = now.strftime("%A, %d %B %Y")
+    time_str = now.strftime("%H:%M")
+    
+    status_cmd = os.path.expanduser("~/repos/termux-launcher-tools/status")
+    status_output = ""
+    try:
+        result = subprocess.run(
+            ["bash", "-c", f"source ~/.bashrc 2>/dev/null; {status_cmd}"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        status_output = result.stdout.strip()
+    except Exception:
+        status_output = "Status unavailable"
+    
+    return f"""
+CURRENT CONTEXT (at session start):
+Date: {date_str}
+Time: {time_str}
+Phone Status:
+{status_output}
+
+NOTE: If user asks for current time/status later, check again - this info may be outdated.
+"""
 
 
 def get_tools():
@@ -131,7 +161,9 @@ def clear_screen():
 def reset_context(messages, preprompt):
     messages.clear()
     if preprompt:
-        messages.append({"role": "system", "content": preprompt})
+        dynamic_context = get_dynamic_context()
+        full_preprompt = preprompt + dynamic_context
+        messages.append({"role": "system", "content": full_preprompt})
     session.turn_count = 0
     session.total_chunks = 0
     session.total_tokens = 0
@@ -253,11 +285,13 @@ def main():
 
     client = OpenAI(base_url=API_ENDPOINT, api_key=API_KEY)
     preprompt = load_preprompt()
+    dynamic_context = get_dynamic_context()
     tools = get_tools()
     
     messages = []
     if preprompt:
-        messages.append({"role": "system", "content": preprompt})
+        full_preprompt = preprompt + dynamic_context
+        messages.append({"role": "system", "content": full_preprompt})
 
     while True:
         signal.signal(signal.SIGINT, handle_sigint_input)
