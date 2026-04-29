@@ -22,6 +22,16 @@ Notifications:
 Media:
   ~/repos/termux-launcher-tools/music <play|pause|toggle|next|prev|volume> - Control media
 
+Volume:
+  ~/repos/termux-launcher-tools/volume list - List all streams with volume bars
+  ~/repos/termux-launcher-tools/volume <stream> - Show volume for stream
+  ~/repos/termux-launcher-tools/volume <stream> <N> - Set absolute volume
+  ~/repos/termux-launcher-tools/volume <stream> up [N] - Increment by N (default 1)
+  ~/repos/termux-launcher-tools/volume <stream> down [N] - Decrement by N (default 1)
+  ~/repos/termux-launcher-tools/volume up [N] - Increment music (default stream)
+  ~/repos/termux-launcher-tools/volume down [N] - Decrement music (default stream)
+  Streams: alarm, call, music, notification, ring, system
+
 System:
   ~/repos/termux-launcher-tools/status - Battery, network, storage, memory, uptime
   termux-battery-status - Detailed battery info (JSON)
@@ -29,7 +39,6 @@ System:
   termux-location - GPS coordinates
   termux-clipboard-get/set - Clipboard access
   termux-torch - Toggle flashlight
-  termux-volume - Adjust volume
   termux-vibrate - Vibrate device
   termux-notification --title "..." --content "..." - Create notification
   termux-dialog - Show input dialog
