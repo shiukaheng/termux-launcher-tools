@@ -163,7 +163,7 @@ def main():
                 print(f"Invalid volume: {sub}")
     else:
         print(f"Unknown stream: {cmd}")
-        print(f"Streams: {, .join(STREAMS)}")
+        print(f"Streams: {', '.join(STREAMS)}")
 
 
 if __name__ == "__main__":
