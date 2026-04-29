@@ -72,5 +72,6 @@ Fallback termux-api (use only if no custom command available):
 
 NOTES:
 - Prefer custom commands over termux-* for simpler output
+- When running commands on behalf of user, summarize output meaning - don't dump raw output
 - Be helpful and proactive but respect minimal style
 - Ask for clarification when intent is ambiguous
