@@ -52,7 +52,7 @@ def list_notifications(verbose=False, show_keys=False):
         display = display[:60] + "..." if len(display) > 60 else display
         
         if show_keys:
-            print(f"[{key}] {display}")
+            print(f"{key}  {display}")
         else:
             print(f"[{i}] {display}")
         
