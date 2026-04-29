@@ -23,6 +23,7 @@ Notifications:
   When listing: summarize notification content for user in plain English. DO NOT show keys to user.
   CRITICAL: Keys are displayed as [KEY] in output. When using --keys, extract ONLY the content inside brackets.
   Example: if output shows "[0|com.example|123]" then use: --keys "0|com.example|123" (NO brackets)
+  NOTE: Notification actions (tap, reply, etc.) require screen ON. They open the app for the user but return no info to you.
 
 Media:
   ~/repos/termux-launcher-tools/music <play|pause|toggle|next|prev|volume> - Control media
