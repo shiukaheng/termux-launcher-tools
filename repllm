@@ -127,8 +127,6 @@ def stream_response(client, messages, tools):
     current_tool_name = None
     actual_usage = None
     
-    print("Thinking...", end="", flush=True)
-    
     try:
         stream = client.chat.completions.create(
             model=MODEL,
@@ -151,15 +149,12 @@ def stream_response(client, messages, tools):
             
             if delta.content:
                 if not has_content:
-                    print(f"\rThinking... ({chunk_count} chunks)", end="", flush=True)
-                    print("\r" + " " * 50 + "\r", end="")
+                    print("\r" + " " * 60 + "\r", end="", flush=True)
                     print("@> ", end="", flush=True)
                     has_content = True
                 
                 print(delta.content, end="", flush=True)
                 content_chunks.append(delta.content)
-            elif not has_content:
-                print(f"\rThinking... ({chunk_count} chunks)", end="", flush=True)
             
             if delta.tool_calls:
                 for tc in delta.tool_calls:
@@ -175,16 +170,19 @@ def stream_response(client, messages, tools):
                             current_tool_name = tc.function.name
                         if tc.function.arguments:
                             tool_calls[idx]["arguments"] += tc.function.arguments
-                
-                if not has_content and current_tool_name:
-                    print(f"\rThinking... ({chunk_count} chunks, generating: {current_tool_name})", end="", flush=True)
+            
+            if not has_content:
+                status = f"Thinking... ({chunk_count} chunks)"
+                if current_tool_name:
+                    status += f", generating: {current_tool_name}"
+                print(f"\r{status:<60}", end="", flush=True)
     
     except KeyboardInterrupt:
         cancelled = True
         if has_content:
             print(" ...cancelled")
         else:
-            print("\r" + " " * 40 + "\r...cancelled")
+            print("\r" + " " * 60 + "\r...cancelled")
     
     if has_content and not cancelled:
         print()
