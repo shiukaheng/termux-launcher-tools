@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Notification watcher - polls and logs new notifications"""
+
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+
+TERMUX_API = os.environ.get("PREFIX", "/data/data/com.termux/files/usr") + "/libexec/termux-api"
+
+
+def run_termux_api(method: str, args: list = None) -> tuple:
+    cmd = [TERMUX_API, method]
+    if args:
+        cmd.extend(args)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.returncode, result.stdout.strip(), result.stderr.strip()
+    except FileNotFoundError:
+        print("Error: termux-api not found. Install with: pkg install termux-api", file=sys.stderr)
+        sys.exit(1)
+
+
+def get_notifications() -> list:
+    returncode, stdout, stderr = run_termux_api("NotificationList")
+    if returncode != 0 or not stdout:
+        return []
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError:
+        return []
+
+
+def format_notification(n: dict) -> str:
+    title = n.get("title", "")
+    content = n.get("content", "")
+    pkg = n.get("packageName", "")
+    
+    if title or content:
+        display = f"{title}: {content}" if title else content
+    else:
+        display = f"[{pkg}]"
+    
+    return display[:80] if len(display) > 80 else display
+
+
+def watch_notifications(interval: int = 5):
+    seen_keys = set()
+    
+    print(f"Watching for new notifications (polling every {interval}s)...")
+    print("Press Ctrl+C to stop.")
+    print()
+    
+    notifications = get_notifications()
+    for n in notifications:
+        key = n.get("key", "")
+        if key:
+            seen_keys.add(key)
+    
+    while True:
+        time.sleep(interval)
+        
+        notifications = get_notifications()
+        current_keys = set()
+        
+        for n in notifications:
+            key = n.get("key", "")
+            if key:
+                current_keys.add(key)
+                
+                if key not in seen_keys:
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+                    display = format_notification(n)
+                    print(f"[{timestamp}] {display}")
+        
+        seen_keys = current_keys
+
+
+def show_usage():
+    print("Usage: notifywatch [-i N|--interval N]")
+    print()
+    print("Polls for new notifications and logs them in real-time.")
+    print()
+    print("Options:")
+    print("  -i N, --interval N  Polling interval in seconds (default: 5)")
+    print()
+    print("Examples:")
+    print("  notifywatch              Poll every 5 seconds")
+    print("  notifywatch -i 10        Poll every 10 seconds")
+    print("  notifywatch --interval 2 Poll every 2 seconds")
+
+
+def main():
+    interval = 5
+    
+    args = sys.argv[1:]
+    
+    if "-h" in args or "--help" in args:
+        show_usage()
+        return
+    
+    i = 0
+    while i < len(args):
+        if args[i] in ("-i", "--interval"):
+            if i + 1 < len(args):
+                try:
+                    interval = int(args[i + 1])
+                    if interval < 1:
+                        print("Error: Interval must be at least 1 second", file=sys.stderr)
+                        sys.exit(1)
+                    i += 2
+                except ValueError:
+                    print(f"Error: Invalid interval '{args[i + 1]}'", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                print(f"Error: {args[i]} requires a value", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print(f"Error: Unknown option '{args[i]}'", file=sys.stderr)
+            sys.exit(1)
+    
+    try:
+        watch_notifications(interval)
+    except KeyboardInterrupt:
+        print("\nStopped.")
+
+
+if __name__ == "__main__":
+    main()
