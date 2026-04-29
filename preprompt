@@ -45,9 +45,8 @@ Web Search:
   NOTE: ALWAYS use --json flag. Without it, ddgr enters interactive mode and hangs waiting for input.
 
 Weather:
-  curl wttr.in - Current weather (auto-detect location)
-  curl wttr.in?format=3 - Brief format: "Weather: Temp"
-  curl wttr.in/"<location>" - Weather for specific location
+  curl "wttr.in/<location>?format=3" - Brief: "<location>: ☀️ +16°C"
+  Replace <location> with user's location (ask if unknown)
 
 Navigation:
   ~/repos/termux-launcher-tools/compass - Launch compass app
