@@ -46,6 +46,11 @@ Web Search:
   termux-open-url <url> - Open URL in browser
   NOTE: ALWAYS use --json flag. Without it, ddgr enters interactive mode and hangs waiting for input.
 
+Web Browsing:
+  w3m -dump "<url>" - View webpage content as text in terminal
+  Example: w3m -dump "https://example.com"
+  WARNING: JavaScript-heavy sites will not display correctly - this is expected.
+
 Weather:
   termux-location -p network -r last - Get device location (lat/lon from network)
   curl "wttr.in/<lat>,<lon>?format=3" - Weather for coordinates (e.g. wttr.in/51.54,-0.06?format=3)
