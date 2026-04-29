@@ -5,16 +5,15 @@ import json
 import subprocess
 import sys
 
-TERMUX_API = "/data/data/com.termux/files/usr/libexec/termux-api"
+TERMUX_VOLUME = "/data/data/com.termux/files/usr/bin/termux-volume"
 
 STREAMS = ["alarm", "call", "music", "notification", "ring", "system"]
 DEFAULT_STREAM = "music"
 
 
 def run_termux_volume(stream=None, volume=None):
-    cmd = [TERMUX_API, "Volume"]
     if stream and volume is not None:
-        subprocess.run(cmd + [stream, str(volume)], capture_output=True, check=True)
+        subprocess.run([TERMUX_VOLUME, stream, str(volume)], capture_output=True, check=True)
         return get_stream_info(stream)
     elif stream:
         return get_stream_info(stream)
@@ -23,7 +22,7 @@ def run_termux_volume(stream=None, volume=None):
 
 
 def get_all_streams():
-    result = subprocess.run([TERMUX_API, "Volume"], capture_output=True, text=True)
+    result = subprocess.run([TERMUX_VOLUME], capture_output=True, text=True)
     if result.returncode != 0:
         return []
     try:
