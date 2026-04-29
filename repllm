@@ -1,0 +1,297 @@
+import json
+import os
+import subprocess
+from openai import OpenAI
+
+API_ENDPOINT = os.environ.get("API_ENDPOINT", "https://api.openai.com/v1")
+API_KEY = os.environ.get("API_KEY", "")
+MODEL = os.environ.get("MODEL", "gpt-4o")
+PREPROMPT_FILE = os.environ.get("PREPROMPT_FILE", "")
+
+
+class SessionState:
+    def __init__(self):
+        self.total_chunks = 0
+        self.total_tokens = 0
+        self.turn_count = 0
+        self.last_turn_chunks = 0
+        self.last_turn_tokens = 0
+
+
+session = SessionState()
+
+
+def load_preprompt() -> str:
+    if not PREPROMPT_FILE:
+        return ""
+    try:
+        with open(PREPROMPT_FILE, "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
+
+
+def get_tools():
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "bash",
+                "description": "Run a bash command after sourcing .bashrc. Use this to execute shell commands.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "The bash command to run",
+                        },
+                    },
+                    "required": ["command"],
+                },
+            },
+        }
+    ]
+
+
+def run_bash_command(command: str) -> tuple[str, bool]:
+    output_lines = []
+    cancelled = False
+    
+    print(f"$ {command}")
+    
+    full_command = f"source ~/.bashrc 2>/dev/null; {command}"
+    
+    try:
+        process = subprocess.Popen(
+            ["bash", "-c", full_command],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        
+        if process.stdout:
+            for line in process.stdout:
+                print(line, end="", flush=True)
+                output_lines.append(line)
+        
+        process.wait()
+    except KeyboardInterrupt:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        cancelled = True
+        print("\n...command cancelled")
+    
+    output = "".join(output_lines)
+    return output, cancelled
+
+
+def handle_tool_call(tool_name: str, tool_args: dict) -> tuple[str, bool]:
+    if tool_name == "bash":
+        command = tool_args.get("command", "")
+        if not command:
+            return "Error: no command provided", False
+        return run_bash_command(command)
+    return f"Unknown tool: {tool_name}", False
+
+
+def print_help():
+    print("""Commands:
+  .help     Show this help message
+  .tokens   Show token usage for this session
+  .exit     Exit the REPL
+  .quit     Exit the REPL""")
+
+
+def print_tokens():
+    print(f"""Token Usage:
+  This turn: {session.last_turn_chunks} chunks (~{session.last_turn_tokens} tokens)
+  Session total: {session.total_chunks} chunks (~{session.total_tokens} tokens)
+  Turns: {session.turn_count}""")
+
+
+def stream_response(client, messages, tools):
+    content_chunks = []
+    tool_calls = {}
+    cancelled = False
+    chunk_count = 0
+    has_content = False
+    current_tool_name = None
+    actual_usage = None
+    
+    print("Thinking...", end="", flush=True)
+    
+    try:
+        stream = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            tools=tools,
+            tool_choice="auto",
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        
+        for chunk in stream:
+            if chunk.usage:
+                actual_usage = chunk.usage
+            
+            if not chunk.choices:
+                continue
+            
+            delta = chunk.choices[0].delta
+            chunk_count += 1
+            
+            if delta.content:
+                if not has_content:
+                    print(f"\rThinking... ({chunk_count} chunks)", end="", flush=True)
+                    print("\r" + " " * 50 + "\r", end="")
+                    print("@> ", end="", flush=True)
+                    has_content = True
+                
+                print(delta.content, end="", flush=True)
+                content_chunks.append(delta.content)
+            elif not has_content:
+                print(f"\rThinking... ({chunk_count} chunks)", end="", flush=True)
+            
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    idx = tc.index
+                    if idx not in tool_calls:
+                        tool_calls[idx] = {"id": "", "name": "", "arguments": ""}
+                    
+                    if tc.id:
+                        tool_calls[idx]["id"] = tc.id
+                    if tc.function:
+                        if tc.function.name:
+                            tool_calls[idx]["name"] = tc.function.name
+                            current_tool_name = tc.function.name
+                        if tc.function.arguments:
+                            tool_calls[idx]["arguments"] += tc.function.arguments
+                
+                if not has_content and current_tool_name:
+                    print(f"\rThinking... ({chunk_count} chunks, generating: {current_tool_name})", end="", flush=True)
+    
+    except KeyboardInterrupt:
+        cancelled = True
+        if has_content:
+            print(" ...cancelled")
+        else:
+            print("\r" + " " * 40 + "\r...cancelled")
+    
+    if has_content and not cancelled:
+        print()
+    
+    content = "".join(content_chunks) if content_chunks else None
+    
+    formatted_tool_calls = None
+    if tool_calls:
+        formatted_tool_calls = []
+        for idx in sorted(tool_calls.keys()):
+            tc = tool_calls[idx]
+            formatted_tool_calls.append({
+                "id": tc["id"],
+                "type": "function",
+                "function": {
+                    "name": tc["name"],
+                    "arguments": tc["arguments"],
+                }
+            })
+    
+    actual_tokens = actual_usage.total_tokens if actual_usage else chunk_count
+    
+    return content, formatted_tool_calls, cancelled, chunk_count, actual_tokens
+
+
+def main():
+    if not API_KEY:
+        print("Error: API_KEY environment variable is required")
+        return
+
+    client = OpenAI(base_url=API_ENDPOINT, api_key=API_KEY)
+    preprompt = load_preprompt()
+    tools = get_tools()
+    
+    messages = []
+    if preprompt:
+        messages.append({"role": "system", "content": preprompt})
+
+    while True:
+        try:
+            user_input = input("*> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            break
+
+        if not user_input:
+            continue
+        
+        if user_input == ".help":
+            print_help()
+            continue
+        if user_input == ".tokens":
+            print_tokens()
+            continue
+        if user_input in (".exit", ".quit"):
+            break
+
+        messages.append({"role": "user", "content": user_input})
+        session.turn_count += 1
+        turn_chunks = 0
+        turn_tokens = 0
+
+        while True:
+            try:
+                content, tool_calls, cancelled, chunks, tokens = stream_response(client, messages, tools)
+                turn_chunks += chunks
+                turn_tokens += tokens
+            except KeyboardInterrupt:
+                print("\n...cancelled")
+                break
+            
+            if cancelled:
+                break
+            
+            message = {"role": "assistant", "content": content}
+            if tool_calls:
+                message["tool_calls"] = tool_calls
+            messages.append(message)
+
+            if not tool_calls:
+                break
+            
+            print("\r" + " " * 60 + "\r", end="")
+            
+            tool_cancelled = False
+            for tool_call in tool_calls:
+                tool_name = tool_call["function"]["name"]
+                tool_args = tool_call["function"]["arguments"]
+                args = json.loads(tool_args) if tool_args else {}
+                
+                try:
+                    result, cancelled = handle_tool_call(tool_name, args)
+                except KeyboardInterrupt:
+                    result = "Command cancelled by user"
+                    cancelled = True
+                
+                if cancelled:
+                    tool_cancelled = True
+                
+                messages.append(
+                    {"role": "tool", "tool_call_id": tool_call["id"], "content": result}
+                )
+            
+            print()
+            
+            if tool_cancelled:
+                break
+        
+        session.last_turn_chunks = turn_chunks
+        session.last_turn_tokens = turn_tokens
+        session.total_chunks += turn_chunks
+        session.total_tokens += turn_tokens
+
+
+if __name__ == "__main__":
+    main()
