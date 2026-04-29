@@ -43,6 +43,9 @@ System:
   ~/repos/termux-launcher-tools/status - Battery, network, storage, memory, uptime
   ~/repos/termux-launcher-tools/update - Update tools from GitHub
 
+Files:
+  ~/storage/shared/ebooks - Ebooks directory (epub files)
+
 Web Search:
   ddgr --json -n 8 "<query>" - Search DuckDuckGo (8 results, JSON output)
   termux-open-url <url> - Open URL in browser
