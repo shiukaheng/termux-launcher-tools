@@ -221,11 +221,15 @@ def main():
         return
 
     interrupt_read, interrupt_write = socket.socketpair()
+    exited = False
     
-    def handle_sigint(signum, frame):
+    def handle_sigint_input(signum, frame):
         interrupt_write.send(b'\0')
     
-    signal.signal(signal.SIGINT, handle_sigint)
+    def handle_sigint_tool(signum, frame):
+        raise KeyboardInterrupt
+    
+    signal.signal(signal.SIGINT, handle_sigint_input)
     interrupt_read.setblocking(False)
 
     client = OpenAI(base_url=API_ENDPOINT, api_key=API_KEY)
@@ -237,6 +241,7 @@ def main():
         messages.append({"role": "system", "content": preprompt})
 
     while True:
+        signal.signal(signal.SIGINT, handle_sigint_input)
         sys.stdout.write("*> ")
         sys.stdout.flush()
         
@@ -253,12 +258,14 @@ def main():
                 except BlockingIOError:
                     pass
                 print()
-                interrupt_read.close()
-                interrupt_write.close()
-                return
+                exited = True
+                break
             
             if sys.stdin in readable:
                 break
+        
+        if exited:
+            break
         
         try:
             user_input = sys.stdin.readline()
@@ -267,6 +274,8 @@ def main():
             user_input = user_input.rstrip('\n').rstrip('\r')
         except KeyboardInterrupt:
             break
+        
+        signal.signal(signal.SIGINT, handle_sigint_tool)
 
         if not user_input:
             continue
