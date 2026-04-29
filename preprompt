@@ -44,6 +44,11 @@ Web Search:
   termux-open-url <url> - Open URL in browser
   NOTE: ALWAYS use --json flag. Without it, ddgr enters interactive mode and hangs waiting for input.
 
+Weather:
+  curl wttr.in - Current weather (auto-detect location)
+  curl wttr.in?format=3 - Brief format: "Weather: Temp"
+  curl wttr.in/"<location>" - Weather for specific location
+
 Navigation:
   ~/repos/termux-launcher-tools/compass - Launch compass app
   ~/repos/termux-launcher-tools/compass <place> - Geocode place name and launch compass pointing toward it
