@@ -347,6 +347,10 @@ def main():
             continue
         if user_input in (".exit", ".quit"):
             break
+        
+        if user_input.startswith("."):
+            print(f"Unknown command: {user_input}. Type .help for available commands.")
+            continue
 
         messages.append({"role": "user", "content": user_input})
         session.turn_count += 1
