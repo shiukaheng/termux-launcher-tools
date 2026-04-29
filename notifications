@@ -32,7 +32,7 @@ def get_notifications() -> list:
         return []
 
 
-def list_notifications(verbose=False):
+def list_notifications(verbose=False, show_keys=False):
     notifications = get_notifications()
     if not notifications:
         print("No notifications")
@@ -42,6 +42,7 @@ def list_notifications(verbose=False):
         title = n.get("title", "")
         content = n.get("content", "")
         pkg = n.get("packageName", "")
+        key = n.get("key", "")
         
         if title or content:
             display = f"{title}: {content}" if title else content
@@ -49,13 +50,16 @@ def list_notifications(verbose=False):
             display = f"[{pkg}]"
         
         display = display[:60] + "..." if len(display) > 60 else display
-        print(f"[{i}] {display}")
+        
+        if show_keys:
+            print(f"[{key}] {display}")
+        else:
+            print(f"[{i}] {display}")
         
         actions = n.get("actions", [])
         has_content_intent = n.get("hasContentIntent", False)
         
         if verbose:
-            key = n.get("key", "")
             print(f"    package: {pkg}")
             print(f"    key: {key}")
             if actions or has_content_intent:
@@ -74,6 +78,26 @@ def list_notifications(verbose=False):
                     title = a.get("title", "?")
                     action_list.append(f"[{title.lower()}]")
                 print(f"    {' '.join(action_list)}")
+
+
+def resolve_notification(identifier: str, use_keys: bool = False) -> dict:
+    notifications = get_notifications()
+    if not notifications:
+        return None
+    
+    if use_keys:
+        for n in notifications:
+            if n.get("key") == identifier:
+                return n
+        return None
+    else:
+        try:
+            idx = int(identifier)
+            if idx < 0 or idx >= len(notifications):
+                return None
+            return notifications[idx]
+        except ValueError:
+            return None
 
 
 def find_action(action_name: str, notification: dict) -> int:
@@ -136,18 +160,29 @@ def show_usage():
     print("Usage: notifications <command> [args]")
     print()
     print("Commands:")
-    print("  list [-v]              List notifications")
-    print("  tap <idx>              Tap notification")
-    print("  cancel <idx|--all>     Cancel notification(s)")
-    print("  <action> <idx>         Fire action on notification")
+    print("  list [-v] [--keys]        List notifications")
+    print("  tap [--keys] <id>         Tap notification")
+    print("  cancel [--keys] <id|--all> Cancel notification(s)")
+    print("  <action> [--keys] <id>    Fire action on notification")
+    print()
+    print("Options:")
+    print("  --keys    Use stable key identifiers instead of indices")
     print()
     print("Examples:")
     print("  notifications list")
     print("  notifications list -v")
+    print("  notifications list --keys")
     print("  notifications tap 1")
+    print("  notifications tap --keys '0|com.example|123'")
     print("  notifications reply 1")
     print("  notifications cancel 1")
     print("  notifications cancel --all")
+
+
+def parse_args(args: list) -> tuple:
+    use_keys = "--keys" in args
+    filtered_args = [a for a in args if a != "--keys"]
+    return use_keys, filtered_args
 
 
 def main():
@@ -159,36 +194,35 @@ def main():
     
     if cmd == "list":
         verbose = "-v" in sys.argv or "--verbose" in sys.argv
-        list_notifications(verbose)
+        show_keys = "--keys" in sys.argv
+        list_notifications(verbose, show_keys)
         return
     
     if cmd == "cancel":
-        if len(sys.argv) < 3:
-            print("Error: cancel requires an index or --all", file=sys.stderr)
-            print("Usage: notifications cancel <idx|--all>", file=sys.stderr)
+        use_keys, args = parse_args(sys.argv[2:])
+        
+        if not args:
+            print("Error: cancel requires an identifier or --all", file=sys.stderr)
+            print("Usage: notifications cancel [--keys] <id|--all>", file=sys.stderr)
             sys.exit(1)
         
-        arg = sys.argv[2]
-        if arg == "--all":
+        if args[0] == "--all":
             cancel_notification(cancel_all=True)
             return
         
-        try:
-            idx = int(arg)
-        except ValueError:
-            print(f"Error: Invalid index '{arg}'", file=sys.stderr)
+        identifier = args[0]
+        n = resolve_notification(identifier, use_keys)
+        
+        if not n:
+            if use_keys:
+                print(f"Error: Key '{identifier}' not found", file=sys.stderr)
+            else:
+                notifications = get_notifications()
+                max_idx = len(notifications) - 1 if notifications else 0
+                print(f"Error: Index {identifier} out of range (0-{max_idx})", file=sys.stderr)
             sys.exit(1)
         
-        notifications = get_notifications()
-        if not notifications:
-            print("Error: No notifications available", file=sys.stderr)
-            sys.exit(1)
-        
-        if idx < 0 or idx >= len(notifications):
-            print(f"Error: Index {idx} out of range (0-{len(notifications)-1})", file=sys.stderr)
-            sys.exit(1)
-        
-        key = notifications[idx].get("key")
+        key = n.get("key")
         if not key:
             print("Error: Notification has no key", file=sys.stderr)
             sys.exit(1)
@@ -201,27 +235,24 @@ def main():
         return
     
     action_name = cmd
+    use_keys, args = parse_args(sys.argv[2:])
     
-    if len(sys.argv) < 3:
-        print(f"Error: '{action_name}' requires a notification index", file=sys.stderr)
+    if not args:
+        print(f"Error: '{action_name}' requires a notification identifier", file=sys.stderr)
         sys.exit(1)
     
-    try:
-        idx = int(sys.argv[2])
-    except ValueError:
-        print(f"Error: Invalid index '{sys.argv[2]}'", file=sys.stderr)
+    identifier = args[0]
+    n = resolve_notification(identifier, use_keys)
+    
+    if not n:
+        if use_keys:
+            print(f"Error: Key '{identifier}' not found", file=sys.stderr)
+        else:
+            notifications = get_notifications()
+            max_idx = len(notifications) - 1 if notifications else 0
+            print(f"Error: Index {identifier} out of range (0-{max_idx})", file=sys.stderr)
         sys.exit(1)
     
-    notifications = get_notifications()
-    if not notifications:
-        print("Error: No notifications available", file=sys.stderr)
-        sys.exit(1)
-    
-    if idx < 0 or idx >= len(notifications):
-        print(f"Error: Index {idx} out of range (0-{len(notifications)-1})", file=sys.stderr)
-        sys.exit(1)
-    
-    n = notifications[idx]
     key = n.get("key")
     if not key:
         print("Error: Notification has no key", file=sys.stderr)

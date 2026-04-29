@@ -15,11 +15,12 @@ App Control:
   ~/repos/termux-launcher-tools/launch <app> [-a <activity>] - Launch app by fuzzy name
   ~/repos/termux-launcher-tools/launchindexer [query] - Search/list installed apps
 
-Notifications:
-  ~/repos/termux-launcher-tools/notifications list [-v] - List notifications with actions
-  ~/repos/termux-launcher-tools/notifications tap <#> - Open notification
-  ~/repos/termux-launcher-tools/notifications <action> <#> - Fire action (reply, archive, etc.)
-  ~/repos/termux-launcher-tools/notifications cancel <#|--all> - Dismiss
+Notifications (ALWAYS use --keys for stable identifiers):
+  ~/repos/termux-launcher-tools/notifications list --keys - List with stable key IDs
+  ~/repos/termux-launcher-tools/notifications tap --keys <key> - Open notification
+  ~/repos/termux-launcher-tools/notifications <action> --keys <key> - Fire action (reply, archive, etc.)
+  ~/repos/termux-launcher-tools/notifications cancel --keys <key|--all> - Dismiss
+  NOTE: --keys mode uses stable identifiers that don't change; indices shift when notifications change
 
 Media:
   ~/repos/termux-launcher-tools/music <play|pause|toggle|next|prev|volume> - Control media
@@ -37,6 +38,12 @@ Volume:
 System:
   ~/repos/termux-launcher-tools/status - Battery, network, storage, memory, uptime
   ~/repos/termux-launcher-tools/update - Update tools from GitHub
+
+Web Search:
+  ddgr -n 5 --json <query> - Search DuckDuckGo, returns JSON with title, url, abstract
+  ddgr -n 5 <query> - Search with text output (numbered results)
+  termux-open-url <url> - Open URL in browser
+  NOTE: Do NOT use ddgr interactive mode. Always run with query and -n flag, parse output.
 
 Navigation:
   ~/repos/termux-launcher-tools/compass - Launch compass app
