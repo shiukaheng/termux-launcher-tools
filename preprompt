@@ -37,7 +37,11 @@ Volume:
 System:
   ~/repos/termux-launcher-tools/status - Battery, network, storage, memory, uptime
   ~/repos/termux-launcher-tools/update - Update tools from GitHub
-  ~/repos/termux-launcher-tools/compass [place] - Launch compass with optional waypoint
+
+Navigation:
+  ~/repos/termux-launcher-tools/compass - Launch compass app
+  ~/repos/termux-launcher-tools/compass <place> - Geocode place name and launch compass pointing toward it
+  ~/repos/termux-launcher-tools/compass-raw <lat> <lng> - Launch compass pointing toward coordinates
 
 Fallback termux-api (use only if no custom command available):
   termux-battery-status - Detailed battery info (JSON)
