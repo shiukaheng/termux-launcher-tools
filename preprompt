@@ -45,8 +45,9 @@ Web Search:
   NOTE: ALWAYS use --json flag. Without it, ddgr enters interactive mode and hangs waiting for input.
 
 Weather:
-  curl "wttr.in/~?format=3" - Auto-detect location from IP (may fail for some networks)
-  curl "wttr.in/<location>?format=3" - Specific location (e.g. London, Tokyo)
+  termux-location -p network -r last - Get device location (lat/lon from network)
+  curl "wttr.in/<lat>,<lon>?format=3" - Weather for coordinates (e.g. wttr.in/51.54,-0.06?format=3)
+  curl "wttr.in/<city>?format=3" - Weather for city name
 
 Navigation:
   ~/repos/termux-launcher-tools/compass - Launch compass app
