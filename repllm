@@ -110,6 +110,8 @@ def print_help():
     print("""Commands:
   .help     Show this help message
   .tokens   Show token usage for this session
+  .clear    Clear the terminal screen
+  .reset    Reset the conversation context
   .exit     Exit the REPL
   .quit     Exit the REPL""")
 
@@ -119,6 +121,23 @@ def print_tokens():
   This turn: {session.last_turn_chunks} chunks (~{session.last_turn_tokens} tokens)
   Session total: {session.total_chunks} chunks (~{session.total_tokens} tokens)
   Turns: {session.turn_count}""")
+
+
+def clear_screen():
+    print("\033[2J\033[H", end="")
+    sys.stdout.flush()
+
+
+def reset_context(messages, preprompt):
+    messages.clear()
+    if preprompt:
+        messages.append({"role": "system", "content": preprompt})
+    session.turn_count = 0
+    session.total_chunks = 0
+    session.total_tokens = 0
+    session.last_turn_chunks = 0
+    session.last_turn_tokens = 0
+    print("Context reset.")
 
 
 def stream_response(client, messages, tools):
@@ -285,6 +304,12 @@ def main():
             continue
         if user_input == ".tokens":
             print_tokens()
+            continue
+        if user_input == ".clear":
+            clear_screen()
+            continue
+        if user_input == ".reset":
+            reset_context(messages, preprompt)
             continue
         if user_input in (".exit", ".quit"):
             break
