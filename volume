@@ -14,7 +14,7 @@ DEFAULT_STREAM = "music"
 def run_termux_volume(stream=None, volume=None):
     cmd = [TERMUX_API, "Volume"]
     if stream and volume is not None:
-        subprocess.run(cmd + [stream, str(volume)], check=True)
+        subprocess.run(cmd + [stream, str(volume)], capture_output=True, check=True)
         return get_stream_info(stream)
     elif stream:
         return get_stream_info(stream)
