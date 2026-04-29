@@ -15,12 +15,13 @@ App Control:
   ~/repos/termux-launcher-tools/launch <app> [-a <activity>] - Launch app by fuzzy name
   ~/repos/termux-launcher-tools/launchindexer [query] - Search/list installed apps
 
-Notifications (ALWAYS use --keys for stable identifiers):
-  ~/repos/termux-launcher-tools/notifications list --keys - List with stable key IDs
+Notifications:
+  ~/repos/termux-launcher-tools/notifications list --keys - List notifications (shows keys for actions)
   ~/repos/termux-launcher-tools/notifications tap --keys <key> - Open notification
   ~/repos/termux-launcher-tools/notifications <action> --keys <key> - Fire action (reply, archive, etc.)
   ~/repos/termux-launcher-tools/notifications cancel --keys <key|--all> - Dismiss
-  NOTE: --keys mode uses stable identifiers. Keys are shown as [key] in list output - use ONLY the key inside brackets, without the brackets.
+  When listing: summarize notification content briefly, keep keys for your own reference to act on them later.
+  Keys shown as [key] - extract key without brackets when using in commands.
 
 Media:
   ~/repos/termux-launcher-tools/music <play|pause|toggle|next|prev|volume> - Control media
