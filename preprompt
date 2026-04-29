@@ -20,7 +20,7 @@ Notifications (ALWAYS use --keys for stable identifiers):
   ~/repos/termux-launcher-tools/notifications tap --keys <key> - Open notification
   ~/repos/termux-launcher-tools/notifications <action> --keys <key> - Fire action (reply, archive, etc.)
   ~/repos/termux-launcher-tools/notifications cancel --keys <key|--all> - Dismiss
-  NOTE: --keys mode uses stable identifiers that don't change; indices shift when notifications change
+  NOTE: --keys mode uses stable identifiers. Keys are shown as [key] in list output - use ONLY the key inside brackets, without the brackets.
 
 Media:
   ~/repos/termux-launcher-tools/music <play|pause|toggle|next|prev|volume> - Control media
