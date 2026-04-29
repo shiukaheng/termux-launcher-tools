@@ -21,8 +21,9 @@ Notifications:
   ~/repos/termux-launcher-tools/notifications <action> --keys <key> - Fire action (reply, archive, etc.)
   ~/repos/termux-launcher-tools/notifications cancel --keys <key|--all> - Dismiss
   When listing: summarize notification content for user in plain English. DO NOT show keys to user.
-  CRITICAL: Keys are displayed as [KEY] in output. When using --keys, extract ONLY the content inside brackets.
-  Example: if output shows "[0|com.example|123]" then use: --keys "0|com.example|123" (NO brackets)
+  CRITICAL: Keys contain pipe characters (|). You MUST wrap the key in double quotes.
+  Example: if output shows "[0|com.example|123]" then use: --keys "0|com.example|123"
+  WRONG: --keys 0|com.example|123 (bash will interpret | as pipe!)
   NOTE: Notification actions (tap, reply, etc.) require screen ON. They open the app for the user but return no info to you.
 
 Media:
