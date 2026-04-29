@@ -44,7 +44,32 @@ System:
   ~/repos/termux-launcher-tools/update - Update tools from GitHub
 
 Files:
-  ~/storage/shared/ebooks - Ebooks directory (epub files)
+  ~/storage/shared/ebooks - Ebooks directory (save epubs here)
+
+Ebook Downloads:
+  Library Genesis (libgen.li) - Shadow library with most books:
+    1. Search: curl -s "http://libgen.li/index.php?req=<title>" | grep -oP 'ids=[0-9,]+' | head -1
+       (or browse: w3m -dump "http://libgen.li/index.php?req=<title>")
+    2. Pick a file ID from the ids list
+    3. Get info: curl -s "http://libgen.li/json.php?object=f&ids=<id>"
+    4. Extract "md5" and "extension" from JSON response
+    5. Download: curl -LO "http://libgen.li/get.php?md5=<md5>" -o ~/storage/shared/ebooks/<name>.<ext>
+    WARNING: Some ISPs block libgen (e.g., Virgin Media UK). If blocked:
+      - Try mirrors: libgen.vg, libgen.bz, libgen.gl
+      - Get mirrors: w3m -dump "https://en.wikipedia.org/wiki/Library_Genesis" | grep -E "libgen\.(li|vg|bz|gl)"
+      - Use mobile data instead of WiFi
+
+  Project Gutenberg (gutenberg.org) - Free public domain books:
+    1. Search: w3m -dump "https://www.gutenberg.org/ebooks/search/?query=<title>"
+    2. Find book ID (e.g., "pg1342" for Pride and Prejudice)
+    3. Download: curl -sLO "https://www.gutenberg.org/cache/epub/1342/pg1342.epub"
+    4. Move: mv pg1342.epub ~/storage/shared/ebooks/<title>.epub
+    Note: Only public domain works (copyright expired, mostly older books)
+
+  Standard Ebooks (standardebooks.org) - Quality public domain:
+    1. Search: w3m -dump "https://standardebooks.org/ebooks?query=<title>"
+    2. Find book page, look for epub download link
+    3. Download: curl -LO "<epub_url>" -o ~/storage/shared/ebooks/<name>.epub
 
 Web Search:
   ddgr --json -n 8 "<query>" - Search DuckDuckGo (8 results, JSON output)
