@@ -178,8 +178,6 @@ def stream_response(client, messages, tools):
             
             if not has_content:
                 status = f"Thinking... ({chunk_count} chunks)"
-                if current_tool_name:
-                    status += f", generating: {current_tool_name}"
                 sys.stdout.write("\r" + " " * last_status_len + "\r" + status)
                 sys.stdout.flush()
                 last_status_len = max(last_status_len, len(status))
