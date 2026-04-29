@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import json
 import os
+import select
 import signal
+import socket
 import subprocess
 import sys
 from openai import OpenAI
@@ -218,11 +220,13 @@ def main():
         print("Error: API_KEY environment variable is required")
         return
 
+    interrupt_read, interrupt_write = socket.socketpair()
+    
     def handle_sigint(signum, frame):
-        print()
-        sys.exit(0)
-
+        interrupt_write.send(b'\0')
+    
     signal.signal(signal.SIGINT, handle_sigint)
+    interrupt_read.setblocking(False)
 
     client = OpenAI(base_url=API_ENDPOINT, api_key=API_KEY)
     preprompt = load_preprompt()
@@ -233,9 +237,35 @@ def main():
         messages.append({"role": "system", "content": preprompt})
 
     while True:
+        sys.stdout.write("*> ")
+        sys.stdout.flush()
+        
+        while True:
+            try:
+                readable, _, _ = select.select([sys.stdin, interrupt_read], [], [])
+            except select.error:
+                continue
+            
+            if interrupt_read in readable:
+                try:
+                    while interrupt_read.recv(1):
+                        pass
+                except BlockingIOError:
+                    pass
+                print()
+                interrupt_read.close()
+                interrupt_write.close()
+                return
+            
+            if sys.stdin in readable:
+                break
+        
         try:
-            user_input = input("*> ").strip()
-        except (EOFError, KeyboardInterrupt):
+            user_input = sys.stdin.readline()
+            if not user_input:
+                break
+            user_input = user_input.rstrip('\n').rstrip('\r')
+        except KeyboardInterrupt:
             break
 
         if not user_input:
@@ -305,6 +335,9 @@ def main():
         session.last_turn_tokens = turn_tokens
         session.total_chunks += turn_chunks
         session.total_tokens += turn_tokens
+
+    interrupt_read.close()
+    interrupt_write.close()
 
 
 if __name__ == "__main__":
