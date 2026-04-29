@@ -61,10 +61,14 @@ Ebook Downloads:
 
   Project Gutenberg (gutenberg.org) - Free public domain books:
     1. Search: w3m -dump "https://www.gutenberg.org/ebooks/search/?query=<title>"
-    2. Find book ID (e.g., "pg1342" for Pride and Prejudice)
-    3. Download: curl -sLO "https://www.gutenberg.org/cache/epub/1342/pg1342.epub"
-    4. Move: mv pg1342.epub ~/storage/shared/ebooks/<title>.epub
+    2. Find book ID from URL or results (e.g., book page shows "pg1342" or URL has /ebooks/1342)
+    3. Download (use cache URL, NOT ebooks URL):
+       curl -sLO "https://www.gutenberg.org/cache/epub/<id>/pg<id>.epub"
+       Example: curl -sLO "https://www.gutenberg.org/cache/epub/1342/pg1342.epub"
+    4. Move: mv pg<id>.epub ~/storage/shared/ebooks/<title>.epub
     Note: Only public domain works (copyright expired, mostly older books)
+    WRONG: https://www.gutenberg.org/ebooks/1342.epub.images (this is a redirect page)
+    CORRECT: https://www.gutenberg.org/cache/epub/1342/pg1342.epub (direct file)
 
   Standard Ebooks (standardebooks.org) - Quality public domain:
     1. Search: w3m -dump "https://standardebooks.org/ebooks?query=<title>"
