@@ -20,7 +20,9 @@ Notifications:
   ~/repos/termux-launcher-tools/notifications tap --keys <key> - Open notification
   ~/repos/termux-launcher-tools/notifications <action> --keys <key> - Fire action (reply, archive, etc.)
   ~/repos/termux-launcher-tools/notifications cancel --keys <key|--all> - Dismiss
-  When listing: summarize notification content for user in plain English. DO NOT show keys to user - keep them internally for your own use when acting on notifications.
+  When listing: summarize notification content for user in plain English. DO NOT show keys to user.
+  CRITICAL: Keys are displayed as [KEY] in output. When using --keys, extract ONLY the content inside brackets.
+  Example: if output shows "[0|com.example|123]" then use: --keys "0|com.example|123" (NO brackets)
 
 Media:
   ~/repos/termux-launcher-tools/music <play|pause|toggle|next|prev|volume> - Control media
