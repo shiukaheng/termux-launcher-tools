@@ -47,7 +47,7 @@ def format_notification(n: dict) -> str:
     return display[:80] if len(display) > 80 else display
 
 
-def watch_notifications(interval: int = 5):
+def watch_notifications(interval: int = 5, show_existing: bool = True):
     seen_keys = set()
     
     print(f"Watching for new notifications (polling every {interval}s)...")
@@ -59,6 +59,10 @@ def watch_notifications(interval: int = 5):
         key = n.get("key", "")
         if key:
             seen_keys.add(key)
+            if show_existing:
+                timestamp = datetime.now().strftime("%H:%M:%S")
+                display = format_notification(n)
+                print(f"[{timestamp}] {display}")
     
     while True:
         time.sleep(interval)
@@ -80,27 +84,33 @@ def watch_notifications(interval: int = 5):
 
 
 def show_usage():
-    print("Usage: notifywatch [-i N|--interval N]")
+    print("Usage: notifywatch [-i N|--interval N] [--new-only]")
     print()
     print("Polls for new notifications and logs them in real-time.")
     print()
     print("Options:")
     print("  -i N, --interval N  Polling interval in seconds (default: 5)")
+    print("  --new-only          Don't show existing notifications on start")
     print()
     print("Examples:")
-    print("  notifywatch              Poll every 5 seconds")
-    print("  notifywatch -i 10        Poll every 10 seconds")
-    print("  notifywatch --interval 2 Poll every 2 seconds")
+    print("  notifywatch              Poll every 5 seconds, show existing")
+    print("  notifywatch -i 10        Poll every 10 seconds, show existing")
+    print("  notifywatch --new-only   Poll every 5 seconds, only new notifications")
 
 
 def main():
     interval = 5
+    show_existing = True
     
     args = sys.argv[1:]
     
     if "-h" in args or "--help" in args:
         show_usage()
         return
+    
+    if "--new-only" in args:
+        show_existing = False
+        args = [a for a in args if a != "--new-only"]
     
     i = 0
     while i < len(args):
@@ -123,7 +133,7 @@ def main():
             sys.exit(1)
     
     try:
-        watch_notifications(interval)
+        watch_notifications(interval, show_existing)
     except KeyboardInterrupt:
         print("\nStopped.")
 
