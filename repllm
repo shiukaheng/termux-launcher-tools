@@ -127,6 +127,7 @@ def stream_response(client, messages, tools):
     has_content = False
     current_tool_name = None
     actual_usage = None
+    last_status_len = 0
     
     try:
         stream = client.chat.completions.create(
@@ -150,11 +151,14 @@ def stream_response(client, messages, tools):
             
             if delta.content:
                 if not has_content:
-                    print("\r" + " " * 60 + "\r", end="", flush=True)
-                    print("@> ", end="", flush=True)
+                    sys.stdout.write("\r" + " " * last_status_len + "\r")
+                    sys.stdout.flush()
+                    sys.stdout.write("@> ")
+                    sys.stdout.flush()
                     has_content = True
                 
-                print(delta.content, end="", flush=True)
+                sys.stdout.write(delta.content)
+                sys.stdout.flush()
                 content_chunks.append(delta.content)
             
             if delta.tool_calls:
@@ -176,14 +180,16 @@ def stream_response(client, messages, tools):
                 status = f"Thinking... ({chunk_count} chunks)"
                 if current_tool_name:
                     status += f", generating: {current_tool_name}"
-                print(f"\r{status:<60}", end="", flush=True)
+                sys.stdout.write("\r" + " " * last_status_len + "\r" + status)
+                sys.stdout.flush()
+                last_status_len = max(last_status_len, len(status))
     
     except KeyboardInterrupt:
         cancelled = True
         if has_content:
             print(" ...cancelled")
         else:
-            print("\r" + " " * 60 + "\r...cancelled")
+            print("\r" + " " * last_status_len + "\r...cancelled")
     
     if has_content and not cancelled:
         print()
