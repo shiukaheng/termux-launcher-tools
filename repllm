@@ -3,6 +3,7 @@ import json
 import os
 import signal
 import subprocess
+import sys
 from openai import OpenAI
 
 API_ENDPOINT = os.environ.get("API_ENDPOINT", "https://api.openai.com/v1")
@@ -215,7 +216,7 @@ def main():
 
     def handle_sigint(signum, frame):
         print()
-        raise KeyboardInterrupt
+        sys.exit(0)
 
     signal.signal(signal.SIGINT, handle_sigint)
 
