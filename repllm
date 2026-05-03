@@ -13,6 +13,7 @@ API_ENDPOINT = os.environ.get("API_ENDPOINT", "https://api.openai.com/v1")
 API_KEY = os.environ.get("API_KEY", "")
 MODEL = os.environ.get("MODEL", "gpt-4o")
 PREPROMPT_FILE = os.environ.get("PREPROMPT_FILE", "")
+CONTEXT_MD_DIR = os.environ.get("CONTEXT_MD_DIR", "")
 
 GREY = "\033[90m"
 RESET = "\033[0m"
@@ -38,6 +39,37 @@ def load_preprompt() -> str:
             return f.read()
     except FileNotFoundError:
         return ""
+
+
+def load_context_md_files() -> str:
+    if not CONTEXT_MD_DIR:
+        return ""
+    
+    context_dir = os.path.expanduser(CONTEXT_MD_DIR)
+    if not os.path.isdir(context_dir):
+        return ""
+    
+    content_parts = []
+    
+    try:
+        md_files = sorted([f for f in os.listdir(context_dir) if f.endswith(".md")])
+    except OSError:
+        return ""
+    
+    for filename in md_files:
+        filepath = os.path.join(context_dir, filename)
+        try:
+            with open(filepath, "r") as f:
+                file_content = f.read().strip()
+                if file_content:
+                    content_parts.append(f"--- {filename} ---\n{file_content}\n")
+        except (OSError, IOError):
+            continue
+    
+    if not content_parts:
+        return ""
+    
+    return "\n# Context Files\n\n" + "".join(content_parts)
 
 
 def get_dynamic_context() -> str:
@@ -158,11 +190,11 @@ def clear_screen():
     sys.stdout.flush()
 
 
-def reset_context(messages, preprompt):
+def reset_context(messages, preprompt, context_md):
     messages.clear()
     if preprompt:
         dynamic_context = get_dynamic_context()
-        full_preprompt = preprompt + dynamic_context
+        full_preprompt = preprompt + context_md + dynamic_context
         messages.append({"role": "system", "content": full_preprompt})
     session.turn_count = 0
     session.total_chunks = 0
@@ -285,12 +317,13 @@ def main():
 
     client = OpenAI(base_url=API_ENDPOINT, api_key=API_KEY)
     preprompt = load_preprompt()
+    context_md = load_context_md_files()
     dynamic_context = get_dynamic_context()
     tools = get_tools()
     
     messages = []
     if preprompt:
-        full_preprompt = preprompt + dynamic_context
+        full_preprompt = preprompt + context_md + dynamic_context
         messages.append({"role": "system", "content": full_preprompt})
 
     while True:
@@ -343,7 +376,7 @@ def main():
             clear_screen()
             continue
         if user_input == ".reset":
-            reset_context(messages, preprompt)
+            reset_context(messages, preprompt, context_md)
             continue
         if user_input in (".exit", ".quit"):
             break

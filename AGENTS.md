@@ -16,6 +16,7 @@ This repo provides command-line tools for controlling an Android phone via Termu
 | `notifications` | `n` | Notification manager (list/cancel/action) |
 | `status` | `s` | System status (battery/network/storage/memory/uptime) |
 | `compass` | - | Launch compass with optional geocoded waypoint |
+| `repllm` | - | LLM REPL with tool calling support |
 | `update` | `u` | Pull latest from GitHub |
 
 ## Architecture
@@ -28,6 +29,7 @@ termux-launcher-tools/
 ├── notifications   # Notification manager via termux-api
 ├── status          # System status display
 ├── compass         # Compass with geocoding
+├── repllm          # LLM REPL with tool calling
 ├── update          # Self-updater
 └── lib/
     ├── __init__.py
@@ -97,19 +99,44 @@ update                     # Pull latest from GitHub
 
 1. Clone repo to `~/repos/termux-launcher-tools`
 2. Add to `~/.bashrc`:
-   ```
-   export PATH="$HOME/repos/termux-launcher-tools:$PATH"
-   alias l="launch"
-   alias li="launchindexer"
-   alias n="notifications"
-   alias m="music"
-   alias s="status"
-   alias u="update"
-   alias x="exit"
-   alias c="clear"
-   ```
+    ```
+    export PATH="$HOME/repos/termux-launcher-tools:$PATH"
+    alias l="launch"
+    alias li="launchindexer"
+    alias n="notifications"
+    alias m="music"
+    alias s="status"
+    alias u="update"
+    alias x="exit"
+    alias c="clear"
+    ```
 3. Run `launchindexer --reindex` to build app index
 4. Install modified termux-api APK for notification features
+
+## Environment Variables
+
+### repllm
+
+The `repllm` tool is an LLM REPL that supports tool calling. It reads the following environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `API_KEY` | OpenAI API key (required) | - |
+| `API_ENDPOINT` | API endpoint URL | `https://api.openai.com/v1` |
+| `MODEL` | Model to use | `gpt-4o` |
+| `PREPROMPT_FILE` | Path to preprompt file | - |
+| `CONTEXT_MD_DIR` | Path to directory containing .md files to append to context | - |
+
+#### CONTEXT_MD_DIR
+
+Set `CONTEXT_MD_DIR` to a directory path containing `.md` files. All markdown files in this directory will be read and appended to the system prompt at session start and on `.reset`. Files are sorted alphabetically.
+
+Example:
+```bash
+export CONTEXT_MD_DIR="$HOME/agent_skills"
+```
+
+This is useful for providing the LLM with reference documentation, API guides, or skill definitions that should always be available in context.
 
 ## Related Repos
 
